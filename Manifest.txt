@@ -1,0 +1,1 @@
+Main-Class: project-master.Game
