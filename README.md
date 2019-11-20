@@ -3,9 +3,11 @@ zatial bez testovacich suborov, tie este pribudnu
 
 kompilacia a spustenie (po rozzipovani)
 
-javac project-master/*.java
+premenovat rozzipovany priecinok na "game"
 
-jar cfm Project.jar Manifest.txt project-master/*.class
+javac game/*.java
+
+jar cfm Project.jar game/Manifest.txt game/*.class
 
 java -jar Project.jar
 
