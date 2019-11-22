@@ -1,0 +1,269 @@
+Output pre konkretnu hru
+
+Enter the number of players:
+2 //input
+Enter the number of dices:
+5 //input
+Game starts
+Player 1
+Your dices:
+5 2 1 3 1
+Wanna roll any of your dices before the game? (true/false)
+true //input
+How many?
+5 //input
+Your dices:
+5 5 3 3 2
+Player 2
+Your dices:
+5 6 3 1 5
+Wanna roll any of your dices before the game? (true/false)
+true //input
+How many?
+7 //input
+Sorry, you can't roll 7 dices. Try again.
+2 //input
+Enter the index of the 1. dice. (1-5)
+6 //input
+Sorry, 6 is not a valid index. Try again.
+Enter the index of the 1. dice. (1-5)
+2 //input
+Enter the index of the 2. dice. (1-5)
+2 //input
+You have already chosen that dice. Please enter another index.
+Enter the index of the 2. dice. (1-5)
+3 //input
+Your dices:
+5 2 2 1 5
+New round
+Player 1
+Your dices:
+5 5 3 3 2
+Do you wanna show some dices and roll the rest? (true/false)
+true //input
+How many dices do you wanna show?
+2 //input
+Enter the index of the 1. dice. (1-5)
+1 //input
+Enter the index of the 2. dice. (1-5)
+2 //input
+Your dices:
+5 5 1 5 1
+Number of dices:
+3 //input
+Value of dices:
+5 //input
+Player 2
+Last guess: 3 5
+Your dices:
+5 2 2 1 5
+Visible dices of other players:
+5 5
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+true //input
+How many dices do you wanna show?
+6 //input
+Sorry, you can't show 6 dices. Try again.
+3 //input
+Enter the index of the 1. dice. (1-5)
+1 //input
+Enter the index of the 2. dice. (1-5)
+4 //input
+Enter the index of the 3. dice. (1-5)
+5 //input
+Your dices:
+5 2 3 1 5
+Number of dices:
+4 //input
+Value of dices:
+5 //input
+Player 1
+Your dices:
+5 5 1 5 1
+Visible dices of other players:
+5 1 5
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+7 //input
+Value of dices:
+5 //input
+Player 2
+Last guess: 7 5
+Your dices:
+5 2 3 1 5
+Visible dices of other players:
+5 5
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Your dices:
+5 2 3 1 5
+Number of dices:
+8 //input
+Value of dices:
+5 //input
+Player 1
+Last guess: 8 5
+Your dices:
+5 5 1 5 1
+Visible dices of other players:
+5 1 5
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+9 //input
+Value of dices:
+5 //input
+Player 2
+Last guess: 9 5
+Your dices:
+5 2 3 1 5
+Visible dices of other players:
+5 5
+Do you wanna raise? (true/false)
+false //input
+Do you really think there aren't 9 dices with value 5? (true/false)
+true //input
+You were right! There were 8 dices with value 5.
+Player 1
+Your dices:
+2 3 2
+Wanna roll any of your dices before the game? (true/false)
+false //input
+OK, you don't have to.
+Your dices:
+2 3 2
+Player 2
+Your dices:
+3 4 4 5 4
+Wanna roll any of your dices before the game? (true/false)
+false //input
+OK, you don't have to.
+Your dices:
+3 4 4 5 4
+New round
+Player 1
+Your dices:
+2 3 2
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+2 //input
+Value of dices:
+2 // input
+Player 2
+Last guess: 2 2
+Your dices:
+3 4 4 5 4
+Visible dices of other players:
+
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+3 //input
+Value of dices:
+4 //input
+Player 1
+Last guess: 3 4
+Your dices:
+2 3 2
+Visible dices of other players:
+
+Do you wanna raise? (true/false)
+false //input
+Do you really think there aren't 3 dices with value 4? (true/false)
+true //input
+You were wrong! There were 3 dices with value 4.
+Player 1
+Your dices:
+5 1
+Wanna roll some dices before the game? (true/false)
+false //input
+OK, you don't have to.
+Your dices:
+5 1
+Player 2
+Your dices:
+4 6 2 4 5 1
+Wanna roll some dices before the game? (true/false)
+false //input
+OK, you don't have to.
+Your dices:
+4 6 2 4 5 1
+New round
+Player 2
+Your dices:
+4 6 2 4 5 1
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+3 //input
+Value of dices:
+4 //input
+Player 1
+Last guess: 3 4
+Your dices:
+5 1
+Visible dices of other players:
+
+Do you wanna raise? (true/false)
+true //input
+Do you wanna show some dices and roll the rest? (true/false)
+false //input
+OK, you don't have to.
+Number of dices:
+25 //input
+Too much! Must be less than 9.
+Number of dices:
+1 //input
+Too little! Must be at least 3 of any value or 2 dices of value 1. Try again.
+Number of dices:
+2 //input
+Too little! Must be at least 3 of any value or 2 dices of value 1. Try again.
+So you can enter 1 as a value in the next step. Do you want to do that? (true/false)
+true //input
+Value of dices:
+5 //input
+You promised to enter value 1, remember? Try again.
+Value of dices:
+1 //input
+Player 2
+Last guess: 2 1
+Your dices:
+4 6 2 4 5 6
+Visible dices of other players:
+
+Do you wanna raise? (true/false)
+false //input
+Do you really think there aren't 2 dices with value 1? (true/false)
+false //input
+Last guess: 2 1
+Your dices:
+4 6 2 4 5 6
+Visible dices of other players:
+
+Do you wanna raise? (true/false)
+false //input
+Do you really think there aren't 2 dices with value 1? (true/false)
+true //input
+Game over :(
+You were right! There was 1 dice with value 1.
+Player 2
+Congratulations, you won!
+Game ends
