@@ -58,7 +58,7 @@ public class Game {
         System.out.println();
     }
     
-    public static Guess newGame(Player[] p, Guess guess) { //pozmenit
+    public static Guess newGame(Player[] p, Guess guess) {
         int playing = 0;
         int winner = -1;
         for (int i=0; i<p.length; i++) {
@@ -68,12 +68,10 @@ public class Game {
             }            
         }
         
-        if (index==-1) {
-            int i = 1;
-            for (Player pl : p) {
-                pl.wannaRoll(i);
-                i++;
-            }
+        int i = 1;
+        for (Player pl : p) {
+            pl.wannaRoll(i);
+            i++;
         }
         
         if (playing<2) {
