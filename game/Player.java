@@ -84,7 +84,7 @@ public class Player {
             System.out.println("Enter the index of the " + (i+1) + ". dice. (1-" + dices.length + ")");
             int m = Game.nextInteger();
             if (!valid(m)) {
-                System.out.println("Sorry, " + n + " is not a valid index. Try again.");
+                System.out.println("Sorry, " + m + " is not a valid index. Try again.");
                 i--;
             } else {
                 if (!addIndex(m-1, indices)) {
