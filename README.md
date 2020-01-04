@@ -1,12 +1,8 @@
-# Projekt Java verzia
-aj s testovacimi subormi, opravene este nejake drobne chyby
+# Projekt JavaScript verzia
+zatial len priebezna verzia v nehotovom stave (metody oznacene "//NIE" nie su spravne, ale stale z povodnej verzie)
 
-kompilacia a spustenie (po rozzipovani a presunuti do priecinka)
+kompilacia a spustenie (po rozzipovani a presunuti do priecinka "game"):
 
-javac game/*.java
+node http_server.js
 
-jar cfm Project.jar game/Manifest.txt game/*.class
-
-java -jar Project.jar
-
-Uprimne dufam, ze je to dobre, googlila a zistovala som to, mne to fungovalo, tak naozaj dufam, ze je to fajn.
+neprilozila som priecinok node_modules, ak treba, pridam ho tiez
