@@ -5,12 +5,4 @@ module.exports = class Guess {
         this.value = v;
     }
     
-    value() {
-        return this.value;
-    }
-    
-    count() {
-        return this.count;
-    }
-    
 }
