@@ -11,7 +11,7 @@ class Game {
     static index = -1;
     static count = 0;
 
-    static nextBoolean(bool, socket, next) {
+    static nextBoolean(bool, socket, next, args) {
         var f = document.createElement("div");
         var b = document.createElement("button");
         b.type = "submit";
@@ -25,7 +25,7 @@ class Game {
             if (!(x == "yes" || x == "no")) {
                 alert("Must input yes or no.");
                 f.parentElement.removeChild(f);
-                Game.nextBoolean(bool, socket, next);
+                Game.nextBoolean(bool, socket, next, args);
             }
             else {
                 f.parentElement.removeChild(f);
@@ -36,8 +36,8 @@ class Game {
                 }
                 socket.emit('createMessage', {
                     code: "answer",
-                    value: { answer: bool.value, continue: next }
-                })
+                    value: { answer: bool.value, continue: next, args: args }
+                });
             }
         };
         document.getElementsByTagName("body")[0].appendChild(f);
@@ -68,29 +68,25 @@ class Game {
         document.getElementsByTagName("body")[0].appendChild(f);
     }
 
-    static nextTurn(p, guess) { //NIE
-        if (guess.count() == 1 && guess.value() == 0) {
-            return Game.newGame(p, guess); //toto nie takto
-        }
-        else {
-            if (Game.index < p.length - 1) {
+    static nextTurn(p, guess) {
+        if (guess.count == 1 && guess.value == 0) {
+            Game.newGame(p, guess);
+        } else {
+            if (Game.index < p.length-1) {
                 Game.index++;
-            }
-            else {
+            } else {
                 Game.index = 0;
             }
             if (p[Game.index].isActive()) {
-                return p[Game.index].play(p, guess, Game.index);
-            }
-            else {
-                return guess;
+                p[Game.index].play(p, guess, Game.index);
+            } else {
+                Game.nextTurn(p, guess);
             }
         }
     }
 
-    static winnerPrinter(winner, p) { //NIE
-        document.getElementById("paragraph").innerHTML = "Player " + (winner) + "<br\>";
-        p[winner - 1].win();
+    static winnerPrinter(winner, p) {
+        p[winner-1].win();
     }
 
     static newRoundPrinter(p, clients) {
@@ -100,6 +96,14 @@ class Game {
                     code: 2,
                     value: "New round"
                 });
+            }
+        }
+        while(!p[Game.index].isActive()) {
+            if (Game.index < p.length-1) {
+                Game.index++;
+            }
+            else {
+                Game.index = 0;
             }
         }
         p[Game.index].wannaRoll2();
@@ -115,12 +119,11 @@ class Game {
                 winner = i;
             }
         }
-        if (playing < 2) { //NIE, prerobit neskor
+        if (playing < 2) {
             Game.winnerPrinter(winner + 1, p);
-            return new Guess(0, 0);
         } else {
             for (var pl of p) {
-                if (pl.isActive()) { //davat pozor aj neskor
+                if (pl.isActive()) {
                     pl.wannaRoll();
                 }
             }
@@ -148,16 +151,10 @@ class Game {
 
     static game(players) {
         Game.newGame(players);
-        /*while (true) { //NIE
-            guess = Game.nextTurn(players, guess);
-            if (guess.count() == 0) {
-                break;
-            }
-        }*/
     }
 
     static check(num, bigger, smaller, message, next, args) {
-        if (num.value <= bigger || num.value > smaller) { //zmena pozor
+        if (num.value <= bigger || num.value > smaller) {
             alert(message);
             Game.nextInteger(num, bigger, smaller, message, next, args);
         }
@@ -188,7 +185,6 @@ class Game {
             document.getElementById("paragraph").innerHTML = "Game";
         }
         alert("Game starts");
-        //alert("Game ends"); //nechcem to takto
     }
 
     static continue(n) {
