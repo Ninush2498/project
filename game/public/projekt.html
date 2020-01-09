@@ -42,11 +42,14 @@
                 break;
             case 2: //print
                 document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+                if (message.value=="Congratulations, you won!") {
+                    alert("Game ends");
+                }
                 break;
             case 3: //ask boolean
                 document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
                 var b = new Boolean();
-                Game.nextBoolean(b, socket, message.value.continue);
+                Game.nextBoolean(b, socket, message.value.continue, message.value.num);
                 break;
             case 4: //ask integer
                 document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
@@ -54,6 +57,22 @@
                 var callback = Game.send;
                 var f;
                 var args;
+                var smaller;
+                var bigger;
+                if (message.value.smaller=="neg") {
+                    smaller = Number.NEGATIVE_INFINITY;
+                } else if (message.value.smaller=="pos") {
+                    smaller = Number.POSITIVE_INFINITY;
+                } else {
+                    smaller = message.value.smaller;
+                }
+                if (message.value.bigger=="neg") {
+                    bigger = Number.NEGATIVE_INFINITY;
+                } else if (message.value.bigger=="pos") {
+                    bigger = Number.POSITIVE_INFINITY;
+                } else {
+                    bigger = message.value.bigger;
+                }
                 switch(message.value.continue) {
                     case "send":
                         f = "rollAtBeginning";
@@ -67,8 +86,16 @@
                         f = "show";
                         args = null;
                         break;
+                    case "raise1":
+                        f = "raise1";
+                        args = null;
+                        break;
+                    case "raise2":
+                        f = "raise2";
+                        args = message.value.args;
+                        break;
                 }
-                Game.nextInteger(n, message.value.bigger, message.value.smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args });
+                Game.nextInteger(n, bigger, smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args });
                 break;
             case 5: //update
                 socket.emit('createMessage', {
