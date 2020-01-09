@@ -143,16 +143,12 @@ class Player {
         });
     }
     
-    static valid(n) { //NETREBA
-        return (n>0 && n<=this.getDices().length);
-    }
-    
-    static validNumberRaise(last, n) { //NIE
-        if(n>Game.count) {
+    static validNumberRaise(last, n, count) {
+        if(n>count) {
             return "count";
-        } else if (last.value()==1) {
-            if (n<2*last.count()){
-                if (n>=last.count()+1) {
+        } else if (last.value==1) {
+            if (n<2*last.count){
+                if (n>=last.count+1) {
                     return "lessOnePossible";
                 } else {
                     return "lessOne";
@@ -161,8 +157,8 @@ class Player {
                 return "valid";
             }
         } else {
-            if (n<last.count()) {
-                if (n>last.count()/2) {
+            if (n<last.count) {
+                if (n>last.count/2) {
                     return "lessPossible";
                 } else {
                     return "less";
@@ -173,118 +169,66 @@ class Player {
         }
     }
     
-    static validValueRaise(last, n, v, one) { //NIE
+    static validValueRaise(last, n, v, one) {
         if(v>6 || v<1) {
             return "range";
         } else if (one && v!=1) {
             return "one";
-        } else if (n==last.count() && v<=last.value() && v!=1){
+        } else if (n==last.count && v<=last.value && v!=1){
             return "noRaise";
         } else {
             return "valid";
         }
     }
     
-    raise(last) { //NIE (ale potialto ano)
-        var n = 0;
-        var v = 0;
-        var one = false;
-        var isValid = false;
-        
-        while(!isValid) {
-            System.out.println("Number of dices:");
-            n = Game.nextInteger();
-            switch(Player.validNumberRaise(last, n)) {
-                case "count":
-                    alert("Too much! Must be less than " + (Game.count+1) + ".");
-                    break;
-                case "lessOnePossible":
-                    alert("Too little! Must be at least " + (2*last.count()) + " of any value or " + (last.count()+1) + " dices of value 1.");
-                    alert("So you can enter 1 as a value in the next step. Do you want to do that? (yes/no)");
-                    if (Game.nextBoolean()) {
-                        one = true;
-                        isValid = true;
-                    }
-                    break;
-                case "lessOne":
-                    alert("Too little! Must be at least " + (2*last.count()) + " of any value or " + (last.count()+1) + " dices of value 1.");
-                    break;
-                case "lessPossible":
-                    alert("Too little! Must be at least " + last.count() + " of any value or " + (last.count()/2+1) + " dices of value 1.");
-                    alert("So you can enter 1 as a value in the next step. Do you want to do that? (yes/no)");
-                    if (Game.nextBoolean()) {
-                        one = true;
-                        isValid = true;
-                    }
-                    break;
-                case "less":
-                    alert("Too little! Must be at least " + last.count() + " of any value or " + (last.count()/2+1) + " dices of value 1.");
-                    break;
-                case "valid":
-                    isValid = true;
-                    break;
+    raise() {
+        this.socket.emit('newMessage', {
+            code: 4,
+            value: {
+                message: "Number of dices:",
+                alert: "",
+                bigger: "neg",
+                smaller: "pos",
+                args: null,
+                continue: "raise1"
             }
-        }
-        isValid = false;
-        while(!isValid) {
-            System.out.println("Value of dices:");
-            v = Game.nextInteger();
-            switch(player.validValueRaise(last, n, v, one)) {
-                case "range":
-                    alert("How could that be on a dice? Try again.");
-                    break;
-                case "one":
-                    alert("You promised to enter value 1, remember? Try again.");
-                    break;
-                case "noRaise":
-                    alert("You didn't raise the number, therefore you have to raise the value.");
-                    System.out.println("Do you want to change the number? (yes/no)");
-                    if (Game.nextBoolean()) {
-                        isValid = true;
-                    }
-                    break;
-                case "valid":
-                    isValid = true;
-                    break;
-            }
-        }
-        return new Guess(n,v);
+        });
     }
     
-    static total(p, guess) { //NIE
+    static total(p, guess) {
         var values = new Array(6).fill(0);
-        for(var x in p) {
+        for(var x of p) {
             if (x.isActive()) {
-                for (var d in x.getDices()) {
+                for (var d of x.getDices()) {
                     values[d-1]++;
                 }
             }
         }
-        if (guess.value()!=1) {
-            return values[guess.value()-1]+values[0];
+        if (guess.value!=1) {
+            return values[guess.value-1]+values[0];
         } else {
             return values[0];
         }
     }
     
-    result(guess, p, index, total) { //NIE
+    result(guess, p, index, total, count) {
               
-        for (var x in p) {
+        for (var x of p) {
             if (x.isActive()) {
-                x.roll();
-                x.visibleDices = new Array(x.getDices().length);
+                x.roll1();
+                x.visibleDices = new Array(x.getDices().length).fill(0);
                 x.visible = 0;
             }
         }
 
         var right;        
-        if (total<guess.count()) {
+        if (total<guess.count) {
             Player.prevPlayer(p, index).loseDice(2);
-            Game.count = Game.count-2;
+            count.value = count.value-2;
             right = "right";
-        } else if (total>guess.count()) {
+        } else if (total>guess.count) {
             this.loseDice(2);
-            Game.count = Game.count-2;
+            count.value = count.value-2;
             right = "wrong";
         } else {
             this.loseDice(1);
@@ -297,42 +241,55 @@ class Player {
             return (right + "=");
         } else {
             return (right + "<");
-        }
-        
+        }        
     }
     
-    stop(p, guess, index) { //NIE
+    stop(p, guess, index, count) {
         var total = Player.total(p, guess);
-        var res = this.result(guess, p, index, total);
+        var res = this.result(guess, p, index, total, count);
         var equal = res.slice(5, 6);
         switch(res) {
             case "right>":
             case "right<":
             case "right=":
-                System.out.print("You were right!");
+                this.socket.emit('newMessage', {
+                    code: 2,
+                    value: "You were right!"
+                });
                 break;
             case "wrong>":
             case "wrong<":
             case "wrong=":
-                System.out.print("You were wrong!");
+                this.socket.emit('newMessage', {
+                    code: 2,
+                    value: "You were wrong!"
+                });
                 break;
         }
+        var output = "";
         switch(equal) {
             case '>':
-                System.out.print(" There were " + total + " dices");
+                output += " There were " + total + " dices";
                 break;
             case '=':
-                System.out.print(" There was 1 dice");
+                output += " There was 1 dice";
                 break;
             case '<':
-                System.out.print(" There were no dices");
+                output += " There were no dices";
                 break;
         }
-        System.out.println(" with value " + guess.value() + ".");
-        
+        output += " with value " + guess.value + ".";
+        this.socket.emit('newMessage', {
+            code: 2,
+            value: output
+        });
+        this.socket.emit('newMessage', {
+            code: 5,
+            value: "play"
+        });
     }
     
-    loseDice(number) { //NIE
+    loseDice(number) {
         if (this.getDices().length>number) { 
             var newDices = new Array();
             for (var i=0; i<this.dices.length-number; i++) {
@@ -344,7 +301,7 @@ class Player {
         }
     }
     
-    gainDice() { //NIE
+    gainDice() {
         var newDices = new Array();
         for (var i=0; i<this.dices.length; i++) {
             newDices[i] = this.dices[i];
@@ -353,15 +310,15 @@ class Player {
         this.dices = newDices;
     }
     
-    static canRaise(guess) { //NIE
-        if (guess.count()<=Game.count && (guess.value()!=1 || guess.count()<Game.count)) {
+    static canRaise(guess, count) {
+        if (guess.count<=count && (guess.value!=1 || guess.count<count)) {
             return true;
         }
         return false;
     }
     
     show(indices) {
-        var vis = new Array();
+        var vis = new Array(this.dices.length).fill(0);
         if (indices==null) {
             for (var i=0; i<this.dices.length; i++) {
                 vis[i] = this.dices[i];
@@ -390,7 +347,15 @@ class Player {
         if (n+this.visible==this.dices.length) {
             this.show(null);
         } else {
-            this.getIndices("show", n, this.visibleDices, null);
+            if (n!=0) {
+                this.getIndices("show", n, this.visibleDices, null);
+            } else {
+                this.wannaRoll2();
+                this.socket.emit('newMessage', {
+                    code: 5,
+                    value: "show"
+                });
+            }
         }
     }
     
@@ -404,51 +369,41 @@ class Player {
         });
     }
     
-    play(p, guess, index) { //NIE
-        System.out.println("Player " + (index+1));
-        
-        while(true) {
-            System.out.println("Last guess: " + guess.count() + " " + guess.value());
-            System.out.println("Your dices:");
-            for (var d in this.getDices()) {
-                System.out.print(d + " ");
-            }
-            System.out.println();
-            System.out.println("Visible dices of other players:");
-            for (var pl in p) {
-                if (pl!=this) {
-                    for (var d in pl.visibleDices) {
-                        if (d!=0) {
-                            System.out.print(d + " ");
-                        }
+    play(p, guess) {
+        this.socket.emit('newMessage', {
+            code:2,
+            value:  "Last guess: " + guess.count + " " + guess.value
+        });
+        this.wannaRoll2();
+        this.socket.emit('newMessage', {
+            code:2,
+            value: "Visible dices of other players:"
+        });
+        var output = "";
+        for (var pl of p) {
+            if (pl!=this) {
+                for (var d of pl.visibleDices) {
+                    if (d!=0) {
+                        output += d + " ";
                     }
                 }
             }
-            System.out.println();
-            System.out.println("Do you wanna raise? (yes/no)");
-            if(Game.nextBoolean()) {
-                if (Player.canRaise(guess)) {
-                    this.askShow();
-                    return this.raise(guess);
-                } else {
-                    alert("Sorry, you can't raise because there are no more dices.");
-                }
-            }
-            System.out.print("Do you really think there ");
-            if (guess.count()==1) {
-                System.out.print("isn't " + guess.count() + " dice ");
-            } else {
-                System.out.print("aren't " + guess.count() + " dices ");
-            }
-            System.out.println("with value " + guess.value() + "? (yes/no)");
-            if (Game.nextBoolean()) {
-                this.stop(p, guess, index);
-                return new Guess(1,0);
-            }
         }
+        this.socket.emit('newMessage', {
+            code:2,
+            value: output
+        });
+        this.socket.emit('newMessage', {
+            code:3,
+            value: {
+                message: "Do you wanna raise? (yes/no)",
+                continue: "play1",
+                args: {}
+            }
+        });
     }
     
-    static prevPlayer(p, index) { //NIE
+    static prevPlayer(p, index) {
         while(true) {
             if (index==0) {
                 index = p.length;
@@ -461,13 +416,19 @@ class Player {
         }           
     }
     
-    gameOver() { //NIE
+    gameOver() {
         this.active = false;
-        System.out.println("Game over :(");
+        this.socket.emit('newMessage', {
+            code: 2,
+            value: "Game over :("
+        });
     }
     
-    win() { //NIE
-        document.getElementById("paragraph").innerHTML += "Congratulations, you won!";
+    win() {
+        this.socket.emit('newMessage', {
+            code: 2,
+            value: "Congratulations, you won!"
+        });
     }
     
 }
