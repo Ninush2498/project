@@ -1,5 +1,5 @@
 # Projekt JavaScript verzia
-zatial len priebezna verzia v nehotovom stave (metody oznacene "//NIE" nie su spravne, ale stale z povodnej verzie)
+finalna verzia, mala by bezat v pohode
 
 kompilacia a spustenie (po rozzipovani a presunuti do priecinka "game"):
 
