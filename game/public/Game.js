@@ -7,9 +7,9 @@ if (typeof module !== "undefined") {
 
 class Game {
 
-    static socket;
-    static index = -1;
-    static count = 0;
+    static socket
+    static index = -1
+    static count = 0
 
     static nextBoolean(bool, socket, next, args) {
         var f = document.createElement("div");
