@@ -1,8 +1,13 @@
 # Projekt JavaScript verzia
 finalna verzia, mala by bezat v pohode
 
-kompilacia a spustenie (po rozzipovani a presunuti do priecinka "game"):
+instalacia:
+
+cd game
+npm install --save-dev utf-8-validate
+npm install --save-dev bufferutil
+npm install
+
+spustenie:
 
 node http_server.js
-
-neprilozila som priecinok node_modules, ak treba, pridam ho tiez
