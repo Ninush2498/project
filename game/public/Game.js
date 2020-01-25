@@ -7,10 +7,6 @@ if (typeof module !== "undefined") {
 
 class Game {
 
-    static socket
-    static index = -1
-    static count = 0
-
     static nextBoolean(bool, socket, next, args) {
         var f = document.createElement("div");
         var b = document.createElement("button");
@@ -203,6 +199,10 @@ class Game {
     }
 
  }
+
+ Game.socket;
+ Game.index = -1;
+ Game.count = 0;
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = Game;
