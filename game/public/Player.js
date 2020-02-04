@@ -56,7 +56,7 @@ class Player {
     }
     
     makeIndices(actual) {
-        var indices = new Array(6).fill();
+        var indices = new Array(this.dices.length).fill();
         if (actual!=null) {
             for (var i=0; i<actual.length; i++) {
                 if (actual[i]!=0) {
@@ -223,12 +223,12 @@ class Player {
 
         var right;        
         if (total<guess.count) {
-            Player.prevPlayer(p, index).loseDice(2);
-            count.value = count.value-2;
+            Player.prevPlayer(p, index).loseDice(guess.count-total);
+            count.value = count.value-(guess.count-total);
             right = "right";
         } else if (total>guess.count) {
-            this.loseDice(2);
-            count.value = count.value-2;
+            this.loseDice(total-guess.count);
+            count.value = count.value-(total-guess.count);
             right = "wrong";
         } else {
             this.loseDice(1);
