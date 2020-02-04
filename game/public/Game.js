@@ -185,7 +185,7 @@ class Game {
 
     static continue(n) {
         var m = new Number();
-        var s = "You need at least 1 dice to play. Please try again.";
+        var s = "You need at least 1 and at most 50 dices to play. Please try again.";
         document.getElementById("paragraph").innerHTML = "Enter the number of dices:";
         Game.nextInteger(m, 0, 50, s, Game.gameStarter, { n1: n, n2: m });
     }
@@ -193,7 +193,7 @@ class Game {
     static main() {
         // TODO code application logic here
         var n = new Number();
-        var s = "At least 2 players are required. Please try again.";
+        var s = "At least 2 and at most 10 players are required. Please try again.";
         document.getElementById("paragraph").innerHTML = "Enter the number of players:";
         Game.nextInteger(n, 1, 10, s, Game.continue, n);
     }
