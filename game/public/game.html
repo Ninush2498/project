@@ -3,6 +3,8 @@
 
 <title id="player"></title>
 
+<a href="https://github.com/Ninush2498/project/blob/master/README.md">Pravidla</a>
+
 <p id="paragraph">Wait please.</p>
 
 <script src="public/Game.js"></script>
@@ -101,6 +103,10 @@ socket.on('newMessage', function(message){
                 code: "update",
                 value: message.value
             });
+            break;
+        case 6:
+            //document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+            //v buducnosti vypisovanie stavu
             break;
     }
 });
