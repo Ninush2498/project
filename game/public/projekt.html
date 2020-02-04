@@ -3,6 +3,8 @@
 
 <title id="player">Project</title>
 
+<a href="https://github.com/Ninush2498/project/blob/master/README.md">Pravidla</a>
+
 <p id="paragraph"></p>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -103,6 +105,10 @@
                     value: message.value
                 });
                 break;
+            case 6: //receive state
+                //document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+                //v buducnosti vypisovanie stavu
+                break;
         }
     });
 
@@ -114,4 +120,4 @@
 
 
 </body>
-</html> 
+</html>
