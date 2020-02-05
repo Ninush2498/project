@@ -223,12 +223,22 @@ class Player {
 
         var right;        
         if (total<guess.count) {
-            Player.prevPlayer(p, index).loseDice(guess.count-total);
-            count.value = count.value-(guess.count-total);
+            if (Player.prevPlayer(p, index).getDices().length<guess.count-total) {
+                Player.prevPlayer(p, index).loseDice(Player.prevPlayer(p, index).getDices().length);
+                count.value = count.value-(Player.prevPlayer(p, index).getDices().length);
+            } else {
+                Player.prevPlayer(p, index).loseDice(guess.count-total);
+                count.value = count.value-(guess.count-total);
+            }
             right = "right";
         } else if (total>guess.count) {
-            this.loseDice(total-guess.count);
-            count.value = count.value-(total-guess.count);
+            if (this.getDices().length<total-guess.count) {
+                this.loseDice(this.getDices().length);
+                count.value = count.value-(this.getDices().length);
+            } else {
+                this.loseDice(total-guess.count);
+                count.value = count.value-(total-guess.count);
+            }
             right = "wrong";
         } else {
             this.loseDice(1);
