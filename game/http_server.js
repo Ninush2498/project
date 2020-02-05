@@ -287,7 +287,7 @@ io.on('connection', (socket)=>{
                     case "raiseTwo":
                         if (newMessage.value.answer) {
                             guess = new Guess(newMessage.value.args.n, newMessage.value.num);
-                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}" + "\n", (err) => {
+                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}, state: " + printState() + "\n", (err) => {
                                 if (err) throw err;
                             });
                             socket.emit('newMessage', {
@@ -448,7 +448,7 @@ io.on('connection', (socket)=>{
                                             visible += v;
                                             a--;
                                             if (a!=0) {
-                                                visible += ", ";
+                                                visible += " ";
                                             }
                                         }
                                     }
@@ -461,6 +461,18 @@ io.on('connection', (socket)=>{
                         }
                         break;
                     case "show":
+                        if (newMessage.value.num+players[num].visible==players[num].dices.length) {
+                            var indices = "{all}";
+                            var hand = "[";
+                            for (var i=0; i<players[num].getDices().length-1; i++) {
+                                hand += players[num].dices[i] + " ";
+                            }
+                            hand += players[num].dices[players[num].dices.length-1] + "]";
+                            var visible = hand;
+                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " showing dices, indices: " + indices + ", hand: " + hand + ", visible dices: " + visible + "\n", (err) => {
+                                if (err) throw err;
+                            });
+                        }
                         players[num].showDices(newMessage.value.num);
                         break;
                     case "raise1":
@@ -591,7 +603,7 @@ io.on('connection', (socket)=>{
                                 break;
                             case "valid":
                                 guess = new Guess(newMessage.value.args.n, newMessage.value.num);
-                                fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}" + "\n", (err) => {
+                                fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}, state: " + printState() + "\n", (err) => {
                                     if (err) throw err;
                                 });
                                 socket.emit('newMessage', {
