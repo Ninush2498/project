@@ -116,7 +116,7 @@ function printState() {
     return s;
 }
 
-fs.writeFile("log.txt", "LOG" + "\n", (err) => {
+fs.appendFile("log.txt", "LOG" + "\n", (err) => {
     if (err) throw err;
 });
 
@@ -707,6 +707,10 @@ app.get("/", (request, response) => { //pripojenie
         response.sendFile("game.html", {root: __dirname + "/public"});
     }
     ip[numOfConnections.value] = request.ip;    
+});
+
+app.get("/pravidla", (request, response) => {
+    response.sendFile("pravidla.html", {root: __dirname + "/public"});
 });
 
 
