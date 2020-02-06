@@ -1,9 +1,10 @@
+<!DOCTYPE html>
 <html>
 <body>
 
 <title id="player">Project</title>
 
-<a href="https://github.com/Ninush2498/project/blob/master/README.md">Pravidla</a>
+<a href="http://localhost:3000/pravidla">Pravidla</a>
 
 <p id="paragraph"></p>
 
@@ -19,6 +20,53 @@
     Game.socket = socket;
     
     window.onload = Game.main();
+
+    function printState(str) {
+        var state = str.visible;
+        var s = "{numOfPlayers: " + state.numOfPlayers + ", ";
+        s += "numOfDices: " + state.numOfDices + ", ";
+        s += "numOfVisibleDices: " + state.numOfVisibleDices + ", ";
+        s += "guess: {count: " + state.guess.count + ", value: " + state.guess.value + "}, ";
+        s += "players: [";
+        for (var i=0; i<state.players.length-1; i++) {
+            s += "{active: " + state.players[i].active;
+            if (state.players[i].active) {
+                s += "visibleDices: [";
+                for (var j=0; j<state.players[i].visibleDices.length-1; j++) {
+                    if (state.players[i].visibleDices[j]!=0) {
+                        s += state.players[i].visibleDices[j] + " ";
+                    }
+                }
+                if (state.players[i].visibleDices[state.players[i].visibleDices.length-1]!=0) {
+                    s += state.players[i].visibleDices[j] + " ";
+                }
+                s += "]";
+            }
+            s += "}, ";
+        }
+        s += "{active: " + state.players[state.players.length-1].active;
+        if (state.players[state.players.length-1].active) {
+            s += ", visibleDices: [";
+            for (var j=0; j<state.players[state.players.length-1].visibleDices.length-1; j++) {
+                if (state.players[state.players.length-1].visibleDices[j]!=0) {
+                    s += state.players[state.players.length-1].visibleDices[j] + " ";
+                }
+            }
+            if (state.players[state.players.length-1].visibleDices[state.players[state.players.length-1].visibleDices.length-1]!=0) {
+                s += state.players[state.players.length-1].visibleDices[state.players[state.players.length-1].visibleDices.length-1] + " ";
+            }
+            s += "]";
+        }
+        s += "}";
+        s += "]";
+        s += ", dices: [";
+        for (var i=0; i<str.dices.length-1; i++) {
+            s += str.dices[i] + " ";
+        }
+        s += str.dices[str.dices.length-1] + "]";
+        s += "}";
+        return s;
+    }
 
     socket.on('connect', function(){
         console.log('Connected to Server');
@@ -106,9 +154,8 @@
                 });
                 break;
             case 6: //receive state
-                //document.getElementById("paragraph").innerHTML += message.value + "<br/>";
-                //v buducnosti vypisovanie stavu
-                break;
+            document.getElementById("paragraph").innerHTML += printState(message.value) + "<br/>";
+            break;
         }
     });
 
@@ -120,4 +167,4 @@
 
 
 </body>
-</html>
+</html> 
