@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<title id="player">Welcome</title>
+
+<button onclick="pravidla()">How to play</button>
+
+<button onclick="login()">Login with Facebook</button>
+
+<p id="paragraph">Welcome to the game! To start please log in.</p>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script src="public/bundle.js"></script>
+
+<script>
+    const queryString = require('/node_modules/query-string/index.js');
+
+    var socket = io();
+    var facebookLoginUrl;
+    var host;
+    var port;
+    socket.on('newMessage', function(message){
+        console.log(message);
+        switch(message.code) {
+            case 0: //other code not expected
+                port = message.value.PORT;
+                host = message.value.HOST;
+                var redirect = "http://";
+                    if (host == "localhost") {
+                        redirect += host + ":" + port + "/newGame";
+                    } else {
+                        redirect += host + "/newGame";
+                    }
+                const stringifiedParams = queryString.stringify({
+                    client_id: message.value.APP_ID,
+                    redirect_uri: redirect,
+                    scope: ['id', 'first_name', 'picture'].join(','),
+                    response_type: 'code',
+                    //state: "{a:abc, b:123}"
+                    //auth_type: 'rerequest',
+                    //display: 'popup',
+                    });
+
+                    facebookLoginUrl = `https://www.facebook.com/v7.0/dialog/oauth?${stringifiedParams}`;
+
+                break;
+        }
+    });
+
+    function login() {
+        /*if (typeof facebookLoginUrl === "undefined") {
+            setTimeout(login, 100);
+        }
+        location.replace(facebookLoginUrl);*/
+        location.replace("http://localhost:3000/newGame");
+    }
+
+    function pravidla() {
+        if (typeof host === "undefined") {
+            setTimeout(pravidla, 100);
+        }
+        if (host == "localhost") {
+            window.open(`http://${host + ":" + port}/pravidla`);
+        } else {
+            window.open(`${host}/pravidla`);
+        }
+    }
+
+</script>
+
+</body>
+</html>
