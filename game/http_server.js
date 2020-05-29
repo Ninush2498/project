@@ -1,26 +1,31 @@
 const express = require("express");
 const socket = require("socket.io");
 const app = express();
+//const app = require("https-localhost")();
 const http = require("http");
-const port = 3000;
 const server = http.createServer(app);
 const io = socket(server);
 const fs = require("fs");
 const mask = require("json-mask");
+const axios = require("axios");
+const res = require("dotenv").config();
+
+if (res.error) {
+    throw res.error
+}
+
+const port = process.env.PORT;
+var env = { HOST: process.env.HOST, PORT: process.env.PORT, APP_ID: process.env.APP_ID };
 
 var numOfConnections = {value: 0};
+var gameCount = 0;
+var activeGames = 0;
 
 let clients = new Map();
-var start = false;
+let games = new Array();
 const Game = require("./public/Game");
 const Guess = require("./public/Guess");
 var Player = require("./public/Player");
-var n;
-var m;
-var players;
-var guess;
-var connected = 0;
-var updated = 0;
 var ip = new Array();
 var state = {
     numOfPlayers: null,
@@ -43,14 +48,15 @@ function time() {
     return t;
 }
 
-function makeState() {
+function makeState(index) {
+    var players = games[index].players;
     state.numOfPlayers = players.length;
-    state.numOfDices = Game.count;
+    state.numOfDices = games[index].count;
     state.numOfVisibleDices = 0;
     for (p of players) {
         state.numOfVisibleDices += p.visible;
     }
-    state.guess = guess;
+    state.guess = games[index].guess;
     state.players = new Array(players.length);
     for (var i=0; i<players.length; i++) {
         state.players[i] = {
@@ -65,14 +71,14 @@ function makeState() {
     }
 }
 
-function printState() {
-    makeState();
+function printState(index) {
+    makeState(index);
     var s = "{numOfPlayers: " + state.numOfPlayers + ", ";
     s += "numOfDices: " + state.numOfDices + ", ";
     s += "numOfVisibleDices: " + state.numOfVisibleDices + ", ";
     s += "guess: {count: " + state.guess.count + ", value: " + state.guess.value + "}, ";
     s += "players: [";
-    for (var i=0; i<players.length-1; i++) {
+    for (var i=0; i<state.players.length-1; i++) {
         s += "{active: " + state.players[i].active;
         if (state.players[i].active) {
             s += ", dices: [";
@@ -93,21 +99,21 @@ function printState() {
         }
         s += "}, ";
     }
-    s += "{active: " + state.players[players.length-1].active;
-    if (state.players[players.length-1].active) {
+    s += "{active: " + state.players[state.players.length-1].active;
+    if (state.players[state.players.length-1].active) {
         s += ", dices: [";
-        for (var j=0; j<state.players[players.length-1].dices.length-1; j++) {
-            s += state.players[players.length-1].dices[j] + " ";
+        for (var j=0; j<state.players[state.players.length-1].dices.length-1; j++) {
+            s += state.players[state.players.length-1].dices[j] + " ";
         }
-        s += state.players[players.length-1].dices[state.players[players.length-1].dices.length-1] + "], ";
+        s += state.players[state.players.length-1].dices[state.players[state.players.length-1].dices.length-1] + "], ";
         s += "visibleDices: [";
-        for (var j=0; j<state.players[players.length-1].visibleDices.length-1; j++) {
-            if (state.players[players.length-1].visibleDices[j]!=0) {
-                s += state.players[players.length-1].visibleDices[j] + " ";
+        for (var j=0; j<state.players[state.players.length-1].visibleDices.length-1; j++) {
+            if (state.players[state.players.length-1].visibleDices[j]!=0) {
+                s += state.players[state.players.length-1].visibleDices[j] + " ";
             }
         }
-        if (state.players[players.length-1].visibleDices[state.players[players.length-1].visibleDices.length-1]!=0) {
-            s += state.players[players.length-1].visibleDices[state.players[players.length-1].visibleDices.length-1] + " ";
+        if (state.players[state.players.length-1].visibleDices[state.players[state.players.length-1].visibleDices.length-1]!=0) {
+            s += state.players[state.players.length-1].visibleDices[state.players[state.players.length-1].visibleDices.length-1] + " ";
         }
         s += "]";
     }
@@ -115,6 +121,40 @@ function printState() {
     s += "]}"
     return s;
 }
+
+async function getAccessTokenFromCode(code) {
+    var redirect;
+    if (process.env.HOST == "localhost") {
+        redirect = process.env.HOST + ":" + process.env.PORT + "/newGame";
+    } else {
+        redirect = process.env.HOST + "/newGame";
+    }
+    const { data } = await axios({
+        url: 'https://graph.facebook.com/v7.0/oauth/access_token',
+        method: 'get',
+        params: {
+            client_id: process.env.APP_ID,
+            client_secret: process.env.APP_SECRET,
+            redirect_uri: redirect,
+            code,
+        },
+    });
+    console.log(data); // { access_token, token_type, expires_in }
+    return data.access_token;
+};
+
+async function getFacebookUserData(accesstoken) {
+    const { data } = await axios({
+        url: 'https://graph.facebook.com/me',
+        method: 'get',
+        params: {
+            fields: ['id', 'first_name', 'picture'].join(','),
+            access_token: accesstoken,
+        },
+    });
+    console.log(data); // { id, first_name, picture }
+    return data;
+};
 
 fs.appendFile("log.txt", "LOG" + "\n", (err) => {
     if (err) throw err;
@@ -125,89 +165,88 @@ fs.appendFile("log.txt", time() + "Server started" + "\n", (err) => {
 });
 
 io.on('connection', (socket)=>{
-    numOfConnections.value++;
-    clients.set(numOfConnections.value, socket);
-
-    fs.appendFile("log.txt", time() + "Player " + numOfConnections.value + " connected, IP: " + ip[numOfConnections.value-1] + "\n", (err) => {
-        if (err) throw err;
-    });
 
     socket.emit('newMessage', {
         code: 0,
-        value: numOfConnections.value
+        value: env
     });
-
-    if (start && numOfConnections.value==n) {
-        start = false;
-        for (var i=1; i<=n; i++) {
-            clients.get(i).emit('newMessage', {
-                code: 1,
-                value: { status: "OK", player: players[i-1] }
-            });
-            players[i-1].socket = clients.get(i);
-            fs.appendFile("log.txt", time() + "Player " + i + " is playing" + "\n", (err) => {
-                if (err) throw err;
-            });
-        }
-    } else if (numOfConnections.value>n) {
-        socket.emit('newMessage', {
-            code: 1,
-            value: "overLimit"
-        });
-        fs.appendFile("log.txt", time() + "Player " + numOfConnections.value + " is over limit" + "\n", (err) => {
-            if (err) throw err;
-        });
-    }
     
 
     socket.on('createMessage', (newMessage)=>{
         console.log(newMessage);
         switch(newMessage.code) {
-            case "start":
-                n = newMessage.value.n;
-                m = newMessage.value.m;
-                fs.appendFile("log.txt", time() + "Number of players selected: " + n + ", number of dices selected: " + m + "\n", (err) => {
+            case "access":
+                numOfConnections.value++;
+                fs.appendFile("log.txt", time() + "Player #" + numOfConnections.value + " connected, IP: " + ip[numOfConnections.value-1] + "\n", (err) => {
                     if (err) throw err;
                 });
-                players = Game.createGame(n, m);
-                if (numOfConnections.value>=n) {
-                    for (var i=1; i<=n; i++) {
-                        clients.get(i).emit('newMessage', {
-                            code: 1,
-                            value: { status: "OK", player: players[i-1] }
-                        });
-                        players[i-1].socket = clients.get(i);
-                        fs.appendFile("log.txt", time() + "Player " + i + " is playing" + "\n", (err) => {
-                            if (err) throw err;
-                        });
-                    }
-                    for (var i=n+1; i<=numOfConnections.value; i++) {
-                        clients.get(i).emit('newMessage', {
-                            code: 1,
-                            value: { status: "overLimit" }
-                        });
-                        fs.appendFile("log.txt", time() + "Player " + i + " is over limit" + "\n", (err) => {
-                            if (err) throw err;
-                        });
-                    }
-                } else {
-                    start = true;
-                }
+                //var token = getAccessTokenFromCode(newMessage.value);
+                //getFacebookUserData(token);
+                //funkcia getAccessToken, niekam ulozit
                 break;
-            case "player":
-                connected++;
-                if (connected==n) {
-                    guess = new Guess(1,0);
-                    fs.appendFile("log.txt", time() + "Game started, state: " + printState() + "\n", (err) => {
-                        if (err) throw err;
+            case "start":
+                games[gameCount] = {
+                    players: null,
+                    count: 0,
+                    guess: null,
+                    index: -1,
+                    connected: 1,
+                    updated: 0,
+                    ended: false,
+                    newTurn: false,
+                    clients: Array()
+                }
+                var n = newMessage.value.n;
+                var m = newMessage.value.m;
+                fs.appendFile("log.txt", time() + "Game #" + gameCount + "; Number of players selected: " + n + ", number of dices selected: " + m + "\n", (err) => {
+                    if (err) throw err;
+                });
+                games[gameCount].players = Game.createGame(n, m);
+                games[gameCount].count = n*m;
+                games[gameCount].clients[0] = socket;
+                clients.set(socket, gameCount);
+                gameCount++;
+                break;
+            case "join":
+                var game = activeGames;
+                if (typeof games[game] !== "undefined" && !games[game].players[0].isActive() && games[game].players.length==2) {
+                    game++;
+                    activeGames++;
+                }
+                if (typeof games[game] === "undefined") {
+                    socket.emit('newMessage', {
+                        code: 1,
+                        value: { status: "overLimit" }
                     });
-                    Game.game(players);
+                } else {
+                    games[game].clients[games[game].connected] = socket;
+                    clients.set(socket, game);
+                    games[game].connected++;
+                    if (games[game].connected==games[game].players.length) {
+                        for (var i=0; i<games[game].connected; i++) {
+                            games[game].clients[i].emit('newMessage', {
+                                code: 1,
+                                value: { status: "OK", player: games[game].players[i], index: i, gameID: game }
+                            });
+                            games[game].players[i].socket = games[game].clients[i];
+                            fs.appendFile("log.txt", time() + "Game #" + game + "; Player " + i + " is playing" + "\n", (err) => {
+                                if (err) throw err;
+                            });
+                        }
+                        games[game].guess = new Guess(1,0);
+                        fs.appendFile("log.txt", time() + "Game #" + game + "; Game started, state: " + printState(game) + "\n", (err) => {
+                            if (err) throw err;
+                        });
+                        activeGames++;
+                        games[game].newTurn = true;
+                        Game.game(games[game].players);
+                    }
                 }
                 break;
             case "answer":
                 var num;
                 var it = 0;
-                clients.forEach((s)=> {
+                games[newMessage.value.gameID].clients.forEach((s)=> {
                     if (s==socket) {
                         num = it;
                     }
@@ -222,7 +261,7 @@ io.on('connection', (socket)=>{
                                     message: "How many?",
                                     alert: "Sorry, you can't roll that many dices. Try again.",
                                     bigger: 0,
-                                    smaller: players[num].getDices().length,
+                                    smaller: games[newMessage.value.gameID].players[num].getDices().length,
                                     continue: "send"
                                 }
                             });
@@ -231,7 +270,7 @@ io.on('connection', (socket)=>{
                                 code: 5,
                                 value: "roll"
                             });
-                            players[num].wannaRoll2(newMessage.value.answer);
+                            games[newMessage.value.gameID].players[num].wannaRoll2(newMessage.value.answer);
                         }
                         break;
                     case "show":
@@ -242,7 +281,7 @@ io.on('connection', (socket)=>{
                                     message: "How many dices do you wanna show?",
                                     alert: "Sorry, you can't show that many dices. Try again.",
                                     bigger: -1,
-                                    smaller: players[num].getDices().length-players[num].visible,
+                                    smaller: games[newMessage.value.gameID].players[num].getDices().length-games[newMessage.value.gameID].players[num].visible,
                                     continue: "show"
                                 }
                             });
@@ -286,14 +325,7 @@ io.on('connection', (socket)=>{
                         break;
                     case "raiseTwo":
                         if (newMessage.value.answer) {
-                            guess = new Guess(newMessage.value.args.n, newMessage.value.num);
-                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}, state: " + printState() + "\n", (err) => {
-                                if (err) throw err;
-                            });
-                            socket.emit('newMessage', {
-                                code: 5,
-                                value: "raise"
-                            });
+                            games[newMessage.value.gameID].players[num].raise();
                         } else {
                             socket.emit('newMessage', {
                                 code: 4,
@@ -310,20 +342,20 @@ io.on('connection', (socket)=>{
                         break;
                     case "play1":
                         if (newMessage.value.answer) {
-                            if (Player.canRaise(guess, Game.count)) {
-                                players[num].askShow();
+                            if (Player.canRaise(games[newMessage.value.gameID].guess, games[newMessage.value.gameID].count)) {
+                                games[newMessage.value.gameID].players[num].askShow();
                             } else {
                                 socket.emit('newMessage', {
                                     code: 2,
                                     value: "Sorry, you can't raise because there are no more dices."
                                 })
                                 var output = "Do you really think there ";
-                                if (guess.count==1) {
-                                    output += "isn't " + guess.count + " dice ";
+                                if (games[newMessage.value.gameID].guess.count==1) {
+                                    output += "isn't " + games[newMessage.value.gameID].guess.count + " dice ";
                                 } else {
-                                    output += "aren't " + guess.count + " dices ";
+                                    output += "aren't " + games[newMessage.value.gameID].guess.count + " dices ";
                                 }
-                                output += "with value " + guess.value + "? (yes/no)";
+                                output += "with value " + games[newMessage.value.gameID].guess.value + "? (yes/no)";
                                 socket.emit('newMessage', {
                                     code: 3,
                                     value: {
@@ -334,12 +366,12 @@ io.on('connection', (socket)=>{
                             }
                         } else {
                             var output = "Do you really think there ";
-                            if (guess.count==1) {
-                                output += "isn't " + guess.count + " dice ";
+                            if (games[newMessage.value.gameID].guess.count==1) {
+                                output += "isn't " + games[newMessage.value.gameID].guess.count + " dice ";
                             } else {
-                                output += "aren't " + guess.count + " dices ";
+                                output += "aren't " + games[newMessage.value.gameID].guess.count + " dices ";
                             }
-                            output += "with value " + guess.value + "? (yes/no)";
+                            output += "with value " + games[newMessage.value.gameID].guess.value + "? (yes/no)";
                             socket.emit('newMessage', {
                                 code: 3,
                                 value: {
@@ -351,12 +383,12 @@ io.on('connection', (socket)=>{
                         break;
                     case "play2":
                         if (newMessage.value.answer) {
-                            var count = { value: Game.count };
-                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " didn't raise at state: " + printState() + "\n", (err) => {
+                            var count = { value: games[newMessage.value.gameID].count };
+                            fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " didn't raise at state: " + printState(newMessage.value.gameID) + "\n", (err) => {
                                 if (err) throw err;
                             });
-                            players[num].stop(players, guess, Game.index, count);
-                            Game.count = count.value;
+                            games[newMessage.value.gameID].players[num].stop(games[newMessage.value.gameID].players, games[newMessage.value.gameID].guess, games[newMessage.value.gameID].index, count);
+                            games[newMessage.value.gameID].count = count.value;
                         } else {
                             socket.emit('newMessage', {
                                 code:3,
@@ -373,7 +405,7 @@ io.on('connection', (socket)=>{
             case "do":
                 var num;
                 var it = 0;
-                clients.forEach((s)=> {
+                games[newMessage.value.gameID].clients.forEach((s)=> {
                     if (s==socket) {
                         num = it;
                     }
@@ -381,14 +413,14 @@ io.on('connection', (socket)=>{
                 });
                 switch(newMessage.value.function) {
                     case "rollAtBeginning":
-                        players[num].rollAtBeginning(newMessage.value.num);
-                        if (newMessage.value.num==players[num].getDices().length) {
+                        games[newMessage.value.gameID].players[num].rollAtBeginning(newMessage.value.num);
+                        if (newMessage.value.num==games[newMessage.value.gameID].players[num].getDices().length) {
                             var hand = "[";
-                            for (var i=0; i<players[num].getDices().length-1; i++) {
-                                hand += players[num].dices[i] + " ";
+                            for (var i=0; i<games[newMessage.value.gameID].players[num].getDices().length-1; i++) {
+                                hand += games[newMessage.value.gameID].players[num].dices[i] + " ";
                             }
-                            hand += players[num].dices[players[num].dices.length-1] + "]";
-                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " rerolling dices, indices: {all}, hand: " + hand + "\n", (err) => {
+                            hand += games[newMessage.value.gameID].players[num].dices[games[newMessage.value.gameID].players[num].dices.length-1] + "]";
+                            fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " rerolling dices, indices: {all}, hand: " + hand + "\n", (err) => {
                                 if (err) throw err;
                             });
                         }
@@ -398,16 +430,16 @@ io.on('connection', (socket)=>{
                             socket.emit('newMessage', {
                                 code: 4,
                                 value: {
-                                    message: "You have already chosen that dice. Please enter another index. (1-" + players[num].dices.length + ")",
+                                    message: "You have already chosen that dice. Please enter another index. (1-" + games[newMessage.value.gameID].players[num].dices.length + ")",
                                     alert: "Sorry, that's not a valid index. Try again.",
                                     bigger: 0,
-                                    smaller: players[num].getDices().length,
+                                    smaller: games[newMessage.value.gameID].players[num].getDices().length,
                                     args: { ind: newMessage.value.args.ind, n: newMessage.value.args.n, use: newMessage.value.args.use },
                                     continue: "addIndex"
                                 }
                             });
                         } else {
-                            players[num].getIndices(newMessage.value.args.use, newMessage.value.args.n, null, newMessage.value.args.ind);
+                            games[newMessage.value.gameID].players[num].getIndices(newMessage.value.args.use, newMessage.value.args.n, null, newMessage.value.args.ind);
                             if (newMessage.value.args.n==0) {
                                 var indices = "{";
                                 var a = 0;
@@ -427,23 +459,23 @@ io.on('connection', (socket)=>{
                                 }
                                 indices += "}";
                                 var hand = "[";
-                                for (var i=0; i<players[num].getDices().length-1; i++) {
-                                    hand += players[num].dices[i] + " ";
+                                for (var i=0; i<games[newMessage.value.gameID].players[num].getDices().length-1; i++) {
+                                    hand += games[newMessage.value.gameID].players[num].dices[i] + " ";
                                 }
-                                hand += players[num].dices[players[num].dices.length-1] + "]";
+                                hand += games[newMessage.value.gameID].players[num].dices[games[newMessage.value.gameID].players[num].dices.length-1] + "]";
                                 if (newMessage.value.args.use=="roll") {
-                                    fs.appendFile("log.txt", time() + "Player " + (num+1) + " rerolling dices, indices: " + indices + ", hand: " + hand + "\n", (err) => {
+                                    fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " rerolling dices, indices: " + indices + ", hand: " + hand + "\n", (err) => {
                                         if (err) throw err;
                                     });
                                 } else {
                                     var visible = "[";
                                     a = 0;
-                                    for (var v of players[num].visibleDices) {
+                                    for (var v of games[newMessage.value.gameID].players[num].visibleDices) {
                                         if (v!=0) {
                                             a++;
                                         }
                                     }
-                                    for (var v of players[num].visibleDices) {
+                                    for (var v of games[newMessage.value.gameID].players[num].visibleDices) {
                                         if (v!=0) {
                                             visible += v;
                                             a--;
@@ -453,7 +485,7 @@ io.on('connection', (socket)=>{
                                         }
                                     }
                                     visible += "]";
-                                    fs.appendFile("log.txt", time() + "Player " + (num+1) + " showing dices, indices: " + indices + ", hand: " + hand + ", visible dices: " + visible + "\n", (err) => {
+                                    fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " showing dices, indices: " + indices + ", hand: " + hand + ", visible dices: " + visible + "\n", (err) => {
                                         if (err) throw err;
                                     });
                                 }
@@ -461,27 +493,27 @@ io.on('connection', (socket)=>{
                         }
                         break;
                     case "show":
-                        if (newMessage.value.num+players[num].visible==players[num].dices.length) {
+                        if (newMessage.value.num+games[newMessage.value.gameID].players[num].visible==games[newMessage.value.gameID].players[num].dices.length) {
                             var indices = "{all}";
                             var hand = "[";
-                            for (var i=0; i<players[num].getDices().length-1; i++) {
-                                hand += players[num].dices[i] + " ";
+                            for (var i=0; i<games[newMessage.value.gameID].players[num].getDices().length-1; i++) {
+                                hand += games[newMessage.value.gameID].players[num].dices[i] + " ";
                             }
-                            hand += players[num].dices[players[num].dices.length-1] + "]";
+                            hand += games[newMessage.value.gameID].players[num].dices[games[newMessage.value.gameID].players[num].dices.length-1] + "]";
                             var visible = hand;
-                            fs.appendFile("log.txt", time() + "Player " + (num+1) + " showing dices, indices: " + indices + ", hand: " + hand + ", visible dices: " + visible + "\n", (err) => {
+                            fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " showing dices, indices: " + indices + ", hand: " + hand + ", visible dices: " + visible + "\n", (err) => {
                                 if (err) throw err;
                             });
                         }
-                        players[num].showDices(newMessage.value.num);
+                        games[newMessage.value.gameID].players[num].showDices(newMessage.value.num);
                         break;
                     case "raise1":
-                        switch(Player.validNumberRaise(guess, newMessage.value.num, Game.count)) {
+                        switch(Player.validNumberRaise(games[newMessage.value.gameID].guess, newMessage.value.num, games[newMessage.value.gameID].count)) {
                             case "count":
                                 socket.emit('newMessage', {
                                     code: 4,
                                     value: {
-                                        message: "Too much! Must be less than " + (Game.count+1) + ".",
+                                        message: "Too much! Must be less than " + (games[newMessage.value.gameID].count+1) + ".",
                                         alert: "",
                                         bigger: "neg",
                                         smaller: "pos",
@@ -493,7 +525,7 @@ io.on('connection', (socket)=>{
                             case "lessOnePossible":
                                 socket.emit('newMessage', {
                                     code: 2,
-                                    value: "Too little! Must be at least " + (2*guess.count) + " of any value or " + (guess.count+1) + " dices of value 1."
+                                    value: "Too little! Must be at least " + (2*games[newMessage.value.gameID].guess.count) + " of any value or " + (games[newMessage.value.gameID].guess.count+1) + " dices of value 1."
                                 });
                                 socket.emit('newMessage', {
                                     code: 3,
@@ -508,7 +540,7 @@ io.on('connection', (socket)=>{
                                 socket.emit('newMessage', {
                                     code: 4,
                                     value: {
-                                        message: "Too little! Must be at least " + (2*guess.count) + " of any value or " + (guess.count+1) + " dices of value 1.",
+                                        message: "Too little! Must be at least " + (2*games[newMessage.value.gameID].guess.count) + " of any value or " + (games[newMessage.value.gameID].guess.count+1) + " dices of value 1.",
                                         alert: "",
                                         bigger: "neg",
                                         smaller: "pos",
@@ -520,7 +552,7 @@ io.on('connection', (socket)=>{
                             case "lessPossible":
                                 socket.emit('newMessage', {
                                     code: 2,
-                                    value: "Too little! Must be at least " + guess.count + " of any value or " + Math.floor(guess.count/2+1) + " dices of value 1."
+                                    value: "Too little! Must be at least " + games[newMessage.value.gameID].guess.count + " of any value or " + Math.floor(games[newMessage.value.gameID].guess.count/2+1) + " dices of value 1."
                                 });
                                 socket.emit('newMessage', {
                                     code: 3,
@@ -535,7 +567,7 @@ io.on('connection', (socket)=>{
                                 socket.emit('newMessage', {
                                     code: 4,
                                     value: {
-                                        message: "Too little! Must be at least " + guess.count + " of any value or " + Math.floor(guess.count/2+1) + " dices of value 1.",
+                                        message: "Too little! Must be at least " + games[newMessage.value.gameID].guess.count + " of any value or " + Math.floor(games[newMessage.value.gameID].guess.count/2+1) + " dices of value 1.",
                                         alert: "",
                                         bigger: "neg",
                                         smaller: "pos",
@@ -560,7 +592,7 @@ io.on('connection', (socket)=>{
                         }
                         break;
                     case "raise2":
-                        switch(Player.validValueRaise(guess, newMessage.value.args.n, newMessage.value.num, newMessage.value.args.one)) {
+                        switch(Player.validValueRaise(games[newMessage.value.gameID].guess, newMessage.value.args.n, newMessage.value.num, newMessage.value.args.one)) {
                             case "range":
                                 socket.emit('newMessage', {
                                     code: 4,
@@ -597,13 +629,13 @@ io.on('connection', (socket)=>{
                                     value: {
                                         message: "Do you want to change the number? (yes/no)",
                                         continue: "raiseTwo",
-                                        num: newMessage.value.num
+                                        num: newMessage.value.args
                                     }
                                 });
                                 break;
                             case "valid":
-                                guess = new Guess(newMessage.value.args.n, newMessage.value.num);
-                                fs.appendFile("log.txt", time() + "Player " + (num+1) + " guessed: {count: " + guess.count + ", value: " + guess.value + "}, state: " + printState() + "\n", (err) => {
+                                games[newMessage.value.gameID].guess = new Guess(newMessage.value.args.n, newMessage.value.num);
+                                fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; Player " + (num+1) + " guessed: {count: " + games[newMessage.value.gameID].guess.count + ", value: " + games[newMessage.value.gameID].guess.value + "}, state: " + printState(newMessage.value.gameID) + "\n", (err) => {
                                     if (err) throw err;
                                 });
                                 socket.emit('newMessage', {
@@ -616,24 +648,57 @@ io.on('connection', (socket)=>{
                 }
                 break;
             case "update":
-                switch(newMessage.value) {
+                switch(newMessage.value.value) {
                     case "roll":
                         var playing = 0;
-                        for (pl of players) {
+                        for (pl of games[newMessage.value.gameID].players) {
                             if (pl.isActive()) {
                                 playing++;
                             }
                         }
-                        updated++;
-                        if (updated==playing) {
-                            updated = 0;
-                            fs.appendFile("log.txt", time() + "New round, state: " + printState() + "\n", (err) => {
+                        games[newMessage.value.gameID].updated++;
+                        if (games[newMessage.value.gameID].updated==playing) {
+                            games[newMessage.value.gameID].updated = 0;
+                            games[newMessage.value.gameID].newTurn = false;
+                            fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; New round, state: " + printState(newMessage.value.gameID) + "\n", (err) => {
                                 if (err) throw err;
                             });
-                            makeState();
+                            makeState(newMessage.value.gameID);
                             var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
                             var i = 0;
-                            clients.forEach((s) => {
+                            games[newMessage.value.gameID].clients.forEach((s) => {
+                                if (games[newMessage.value.gameID].players[i].isActive()) {
+                                    var visibleState = {
+                                        visible: mask(state, fields),
+                                        dices: state.players[i].dices
+                                    };
+                                    s.emit('newMessage', {
+                                        code: 6,
+                                        value: visibleState
+                                    });
+                                }
+                                i++;
+                            });
+                            Game.newGame2(games[newMessage.value.gameID]);
+                        }
+                        break;
+                    case "show":
+                        var num;
+                        var it = 0;
+                        games[newMessage.value.gameID].clients.forEach((s)=> {
+                            if (s==socket) {
+                                num = it;
+                            }
+                            it++;
+                        });
+                        games[newMessage.value.gameID].players[num].raise();
+                        break;
+                    case "raise":
+                        makeState(newMessage.value.gameID);
+                        var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
+                        var i = 0;
+                        games[newMessage.value.gameID].clients.forEach((s) => {
+                            if (games[newMessage.value.gameID].players[i].isActive()) {
                                 var visibleState = {
                                     visible: mask(state, fields),
                                     dices: state.players[i].dices
@@ -642,45 +707,17 @@ io.on('connection', (socket)=>{
                                     code: 6,
                                     value: visibleState
                                 });
-                                i++;
-                            });
-                            Game.newGame2(players, clients);
-                        }
-                        break;
-                    case "show":
-                        var num;
-                        var it = 0;
-                        clients.forEach((s)=> {
-                            if (s==socket) {
-                                num = it;
                             }
-                            it++;
-                        });
-                        players[num].raise();
-                        break;
-                    case "raise":
-                        makeState();
-                        var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
-                        var i = 0;
-                        clients.forEach((s) => {
-                            var visibleState = {
-                                visible: mask(state, fields),
-                                dices: state.players[i].dices
-                            };
-                            s.emit('newMessage', {
-                                code: 6,
-                                value: visibleState
-                            });
                             i++;
                         });
-                        Game.nextTurn(players, guess);
+                        Game.nextTurn(games[newMessage.value.gameID]);
                         break;
                     case "play":
-                        guess = new Guess(1,0);
-                        fs.appendFile("log.txt", time() + "New round, state: " + printState() + "\n", (err) => {
+                        games[newMessage.value.gameID].guess = new Guess(1,0);
+                        fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; New round, state: " + printState(newMessage.value.gameID) + "\n", (err) => {
                             if (err) throw err;
                         });
-                        Game.nextTurn(players, guess);
+                        Game.nextTurn(games[newMessage.value.gameID]);
                         break;
                 }
                 break;
@@ -689,11 +726,54 @@ io.on('connection', (socket)=>{
     
 
     socket.on('disconnect', ()=>{
+        var index = clients.get(socket);
+        if (typeof index !== "undefined") {
+            var active = 0;
+            var last;
+            for (var i=0; i<games[index].clients.length; i++) {
+                if (games[index].clients[i]==socket) {
+                    games[index].players[i].active = false;
+                    if (games[index].index==i && !games[index].ended) {
+                        Game.nextTurn(games[index]);
+                    }
+                    fs.appendFile("log.txt", time() + "Player " + (i+1) + " from game #" + index + " disconnected" + "\n", (err) => {
+                        if (err) throw err;
+                    });
+                }
+                if (games[index].players[i].active) {
+                    active++;
+                    last = i;
+                }
+            }
+            if (games[index].newTurn && !games[index].ended && games[index].updated==active) {
+                games[index].updated = 0;
+                games[index].newTurn = false;
+                fs.appendFile("log.txt", time() + "Game #" + index + "; New round, state: " + printState(index) + "\n", (err) => {
+                    if (err) throw err;
+                });
+                makeState(index);
+                var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
+                var i = 0;
+                games[index].clients.forEach((s) => {
+                    if (games[index].players[i].isActive()) {
+                        var visibleState = {
+                            visible: mask(state, fields),
+                            dices: state.players[i].dices
+                        };
+                        s.emit('newMessage', {
+                            code: 6,
+                            value: visibleState
+                        });
+                    }
+                    i++;
+                });
+                Game.newGame2(games[index]);
+            }
+            if (active==1) {
+                games[index].ended = true;
+            }
+        }
         clients.delete(socket);
-        numOfConnections.value--;
-        fs.appendFile("log.txt", time() + "Player disconnected, unable to continue" + "\n", (err) => {
-            if (err) throw err;
-        });
     });
   });
 
@@ -701,18 +781,21 @@ io.on('connection', (socket)=>{
 app.use('/public', express.static(__dirname + "/public"));
 
 app.get("/", (request, response) => { //pripojenie
-    if (numOfConnections.value==0) {
-        response.sendFile("projekt.html", {root: __dirname + "/public"});
-    } else {
-        response.sendFile("game.html", {root: __dirname + "/public"});
-    }
-    ip[numOfConnections.value] = request.ip;    
+    response.sendFile("start.html", {root: __dirname + "/public"});
 });
 
 app.get("/pravidla", (request, response) => {
     response.sendFile("pravidla.html", {root: __dirname + "/public"});
 });
 
+app.get("/newGame", (request, response) => {
+    response.sendFile("projekt.html", {root: __dirname + "/public"});
+    ip[numOfConnections.value] = request.ip;
+});
+
+app.get("/joinGame", (request, response) => {
+    response.sendFile("game.html", {root: __dirname + "/public"});
+});
 
 server.listen(port, (err) => {
     if (err) {
