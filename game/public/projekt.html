@@ -2,24 +2,77 @@
 <html>
 <body>
 
-<title id="player">Project</title>
+<title id="player">New game</title>
 
-<a href="http://localhost:3000/pravidla">Pravidla</a>
+<button onclick="pravidla()">How to play</button>
 
 <p id="paragraph"></p>
 
 <script src="/socket.io/socket.io.js"></script>
 
+<script src="public/bundle.js"></script>
+
 <script src="public/Game.js"></script>
 
 <script>
 
+    var host;
+    var port;
+
+    function pravidla() {
+        if (typeof host === "undefined") {
+            setTimeout(pravidla, 100);
+        }
+        if (host == "localhost") {
+            window.open(`http://${host + ":" + port}/pravidla`);
+        } else {
+            window.open(`${host}/pravidla`);
+        }
+    }
+
+    const queryString = require('/node_modules/query-string/index.js');
+
+    const urlParams = queryString.parse(window.location.search);
+
+    //if (typeof urlParams.code === "undefined" && typeof sessionStorage.getItem("connected") === "undefined") {location.replace();}
+
+    console.log(`The code is: ${urlParams.code}`);
+
     var socket = io();
     var player;
 
-    Game.socket = socket;
+
+    socket.emit('createMessage', {
+        code: "access",
+        value: urlParams.code
+    });
     
-    window.onload = Game.main();
+    
+    var f = document.createElement("div");
+    var b1 = document.createElement("button");
+    b1.type = "button";
+    b1.innerHTML = "New game";
+    var b2 = document.createElement("button");
+    b2.type = "button";
+    b2.innerHTML = "Join in an existing game";
+    f.appendChild(b1);
+    f.appendChild(b2);
+    b1.onclick = function() {
+        Game.main(socket);
+        document.getElementsByTagName("body")[0].removeChild(f);
+    }
+    b2.onclick = function() {
+        if (typeof host === "undefined") {
+            setTimeout(b2.onclick, 100);
+        }
+        sessionStorage.setItem("connected", "true");
+        if (host == "localhost") {
+            location.replace(`http://${host + ":" + port}/joinGame`);
+        } else {
+            location.replace(`${host}/joinGame`);
+        }
+    }
+    document.getElementsByTagName("body")[0].appendChild(f);
 
     function printState(str) {
         var state = str.visible;
@@ -75,17 +128,17 @@
     socket.on('newMessage', function(message){
         console.log(message);
         switch(message.code) {
-            case 0: //start
-                document.getElementById("player").innerHTML = "Player " + message.value;
+            case 0: //environment variables
+                host = message.value.HOST;
+                port = message.value.PORT;
                 break;
             case 1: //status
                 if (message.value.status=="OK") {
+                    sessionStorage.setItem("gameID", message.value.gameID);
+                    sessionStorage.setItem("playerID", message.value.index);
+                    document.getElementById("player").innerHTML = "Player " + (message.value.index+1);
                     document.getElementById("paragraph").innerHTML = "";
                     player = message.value.player;
-                    socket.emit('createMessage', {
-                        code: "player",
-                        value: { number: 1, socket: socket.id }
-                    });
                 } else {
                     document.getElementById("paragraph").innerHTML = "Sorry, you can't play.";
                 }
@@ -99,7 +152,7 @@
             case 3: //ask boolean
                 document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
                 var b = new Boolean();
-                Game.nextBoolean(b, socket, message.value.continue, message.value.num);
+                Game.nextBoolean(b, socket, message.value.continue, message.value.num, sessionStorage.getItem("gameID"));
                 break;
             case 4: //ask integer
                 document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
@@ -145,26 +198,27 @@
                         args = message.value.args;
                         break;
                 }
-                Game.nextInteger(n, bigger, smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args });
+                Game.nextInteger(n, bigger, smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args, gameID: sessionStorage.getItem("gameID") });
                 break;
             case 5: //update
                 socket.emit('createMessage', {
                     code: "update",
-                    value: message.value
+                    value: { value: message.value, gameID: sessionStorage.getItem("gameID") }
                 });
                 break;
             case 6: //receive state
-            document.getElementById("paragraph").innerHTML += printState(message.value) + "<br/>";
-            break;
+                document.getElementById("paragraph").innerHTML += printState(message.value) + "<br/>";
+                break;
         }
     });
 
 
     socket.on('disconnect', function(){
         console.log('Disconnected from server');
+        sessionStorage.clear();
     });
 </script> 
 
 
 </body>
-</html> 
+</html>
