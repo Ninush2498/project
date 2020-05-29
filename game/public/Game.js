@@ -7,7 +7,7 @@ if (typeof module !== "undefined") {
 
 class Game {
 
-    static nextBoolean(bool, socket, next, args) {
+    static nextBoolean(bool, socket, next, args, gameID) {
         var f = document.createElement("div");
         var b = document.createElement("button");
         b.type = "submit";
@@ -21,9 +21,8 @@ class Game {
             if (!(x == "yes" || x == "no")) {
                 alert("Must input yes or no.");
                 f.parentElement.removeChild(f);
-                Game.nextBoolean(bool, socket, next, args);
-            }
-            else {
+                Game.nextBoolean(bool, socket, next, args, gameID);
+            } else {
                 f.parentElement.removeChild(f);
                 if (x == "yes") {
                     bool.value = true;
@@ -32,10 +31,15 @@ class Game {
                 }
                 socket.emit('createMessage', {
                     code: "answer",
-                    value: { answer: bool.value, continue: next, args: args }
+                    value: { answer: bool.value, continue: next, args: args, gameID: gameID }
                 });
             }
         };
+        s.addEventListener("keypress", function(event) {
+            if (event.keyCode == 13) {
+                b.click();
+            }
+        });
         document.getElementsByTagName("body")[0].appendChild(f);
     }
 
@@ -54,56 +58,60 @@ class Game {
                 alert("Must input integer.");
                 f.parentElement.removeChild(f);
                 Game.nextInteger(num, bigger, smaller, message, next, args);
-            }
-            else {
+            } else {
                 f.parentElement.removeChild(f);
                 num.value = Number(x);
                 Game.check(num, bigger, smaller, message, next, args);
             }
         };
+        s.addEventListener("keypress", function(event) {
+            if (event.keyCode == 13) {
+                b.click();
+            }
+        });
         document.getElementsByTagName("body")[0].appendChild(f);
     }
 
-    static nextTurn(p, guess) {
-        if (guess.count == 1 && guess.value == 0) {
-            Game.newGame(p, guess);
+    static nextTurn(game) {
+        if (game.guess.count == 1 && game.guess.value == 0 || game.ended) {
+            game.newTurn = true;
+            Game.newGame(game.players);
         } else {
-            if (Game.index < p.length-1) {
-                Game.index++;
+            if (game.index < game.players.length-1) {
+                game.index++;
             } else {
-                Game.index = 0;
+                game.index = 0;
             }
-            if (p[Game.index].isActive()) {
-                p[Game.index].play(p, guess, Game.index);
+            if (game.players[game.index].isActive()) {
+                game.players[game.index].play(game.players, game.guess);
             } else {
-                Game.nextTurn(p, guess);
+                Game.nextTurn(game);
             }
         }
     }
 
     static winnerPrinter(winner, p) {
-        p[winner-1].win();
+        p[winner].win();
     }
 
-    static newRoundPrinter(p, clients) {
-        for (var i=1; i<=p.length; i++) {
-            if (p[i-1].isActive()) {
-                clients.get(i).emit('newMessage', {
+    static newRoundPrinter(game) {
+        for (var i=0; i<game.players.length; i++) {
+            if (game.players[i].isActive()) {
+                game.clients[i].emit('newMessage', {
                     code: 2,
                     value: "New round"
                 });
             }
         }
-        while(!p[Game.index].isActive()) {
-            if (Game.index < p.length-1) {
-                Game.index++;
-            }
-            else {
-                Game.index = 0;
+        while(!game.players[game.index].isActive()) {
+            if (game.index < game.players.length-1) {
+                game.index++;
+            } else {
+                game.index = 0;
             }
         }
-        p[Game.index].wannaRoll2();
-        p[Game.index].askShow();
+        game.players[game.index].wannaRoll2();
+        game.players[game.index].askShow();
     }
 
     static newGame(p) {
@@ -116,7 +124,7 @@ class Game {
             }
         }
         if (playing < 2) {
-            Game.winnerPrinter(winner + 1, p);
+            Game.winnerPrinter(winner, p);
         } else {
             for (var pl of p) {
                 if (pl.isActive()) {
@@ -126,21 +134,19 @@ class Game {
         }
     }
 
-    static newGame2(p, clients) {
-        if (Game.index < p.length-1) {
-            Game.index++;
+    static newGame2(game) {
+        if (game.index < game.players.length-1) {
+            game.index++;
+        } else {
+            game.index = 0;
         }
-        else {
-            Game.index = 0;
-        }
-        Game.newRoundPrinter(p, clients);
+        Game.newRoundPrinter(game);
     }
 
     static createGame(n, m) {
         var players = new Array();
         for (var i = 0; i < n; i++) {
             players[i] = new Player(m);
-            Game.count += m;
         }
         return players;
     }
@@ -153,8 +159,7 @@ class Game {
         if (num.value <= bigger || num.value > smaller) {
             alert(message);
             Game.nextInteger(num, bigger, smaller, message, next, args);
-        }
-        else {
+        } else {
             next(args);
         }
     }
@@ -162,47 +167,42 @@ class Game {
     static send(args) {
         args.socket.emit('createMessage', {
             code: "do",
-            value: { function: args.function, num: args.value.value, args: args.args }
+            value: { function: args.function, num: args.value.value, args: args.args, gameID: args.gameID }
         });
     }
 
     static gameStarter(args) {
-        Game.socket.emit('createMessage', {
+        args.socket.emit('createMessage', {
             code: "start",
             value: { n: args.n1.value, m: args.n2.value }
         });
         if (args.n1.value == 2) {
             document.getElementById("paragraph").innerHTML = "Waiting for " + (args.n1.value-1) + " player to connect.";
-        }
-        else if (args.n1.value > 2) {
+        } else if (args.n1.value > 2) {
             document.getElementById("paragraph").innerHTML = "Waiting for " + (args.n1.value-1) + " players to connect.";
-        }
-        else {
+        } else {
             document.getElementById("paragraph").innerHTML = "Game";
         }
         alert("Game starts");
     }
 
-    static continue(n) {
+    static continue(args) {
         var m = new Number();
         var s = "You need at least 1 and at most 50 dices to play. Please try again.";
         document.getElementById("paragraph").innerHTML = "Enter the number of dices:";
-        Game.nextInteger(m, 0, 50, s, Game.gameStarter, { n1: n, n2: m });
+        Game.nextInteger(m, 0, 50, s, Game.gameStarter, { n1: args.n, n2: m, socket: args.socket });
     }
 
-    static main() {
+    static main(socket) {
         // TODO code application logic here
-        var n = new Number();
+        var args = { n: new Number(), socket: socket }
         var s = "At least 2 and at most 10 players are required. Please try again.";
         document.getElementById("paragraph").innerHTML = "Enter the number of players:";
-        Game.nextInteger(n, 1, 10, s, Game.continue, n);
+        Game.nextInteger(args.n, 1, 10, s, Game.continue, args);
     }
 
- }
+}
 
- Game.socket;
- Game.index = -1;
- Game.count = 0;
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = Game;
