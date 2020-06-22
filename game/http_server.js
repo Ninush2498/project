@@ -11,7 +11,7 @@ const axios = require("axios");
 const res = require("dotenv").config();
 
 if (res.error) {
-    throw res.error
+    throw res.error;
 }
 
 const port = process.env.PORT;
@@ -31,9 +31,20 @@ var state = {
     numOfPlayers: null,
     numOfDices: null, //spolu
     numOfVisibleDices: null, //spolu
+    index: null, //ktory hrac je na rade
     guess: null, //aktualna stavka
     players: null //ci hraju a pripadne ruka a visible ruka
 };
+
+let leaderboard = new Array(10);
+var leader = {
+    name: "- - - -",
+    score: "-",
+    realScore: 0
+};
+for (var i=0; i<10; i++) {
+    leaderboard[i] = leader;
+}
 
 function time() {
     var d = new Date(Date.now());
@@ -53,19 +64,24 @@ function makeState(index) {
     state.numOfPlayers = players.length;
     state.numOfDices = games[index].count;
     state.numOfVisibleDices = 0;
+    state.index = games[index].index;
     for (p of players) {
         state.numOfVisibleDices += p.visible;
     }
     state.guess = games[index].guess;
+    state.guesses = games[index].guesses;
     state.players = new Array(players.length);
     for (var i=0; i<players.length; i++) {
         state.players[i] = {
+            name: games[index].names[i],
             active: players[i].isActive(),
-            dices: null,
-            visibleDices: null
+            dices: new Array(0),
+            numOfDices: 0,
+            visibleDices: new Array(0)
         };
         if (players[i].isActive()) {
             state.players[i].dices = players[i].getDices();
+            state.players[i].numOfDices = state.players[i].dices.length;
             state.players[i].visibleDices = players[i].visibleDices;
         }
     }
@@ -168,7 +184,7 @@ io.on('connection', (socket)=>{
 
     socket.emit('newMessage', {
         code: 0,
-        value: env
+        value: { env: env, leaderboard: leaderboard }
     });
     
 
@@ -182,11 +198,12 @@ io.on('connection', (socket)=>{
                 });
                 //var token = getAccessTokenFromCode(newMessage.value);
                 //getFacebookUserData(token);
-                //funkcia getAccessToken, niekam ulozit
                 break;
             case "start":
                 games[gameCount] = {
                     players: null,
+                    names: null,
+                    guesses: null,
                     count: 0,
                     guess: null,
                     index: -1,
@@ -202,8 +219,12 @@ io.on('connection', (socket)=>{
                     if (err) throw err;
                 });
                 games[gameCount].players = Game.createGame(n, m);
+                games[gameCount].names = Array(n);
+                games[gameCount].guesses = Array(n);
                 games[gameCount].count = n*m;
                 games[gameCount].clients[0] = socket;
+                games[gameCount].names[0] = newMessage.value.name;
+                games[gameCount].guesses[0] = new Guess("-", "-");
                 clients.set(socket, gameCount);
                 gameCount++;
                 break;
@@ -220,26 +241,36 @@ io.on('connection', (socket)=>{
                     });
                 } else {
                     games[game].clients[games[game].connected] = socket;
+                    games[game].names[games[game].connected] = newMessage.value;
+                    games[game].guesses[games[game].connected] = new Guess("-", "-");
                     clients.set(socket, game);
                     games[game].connected++;
                     if (games[game].connected==games[game].players.length) {
+                        games[game].guess = new Guess(1,0);
                         for (var i=0; i<games[game].connected; i++) {
+                            makeState(game);
+                            var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
+                            if (games[game].players[i].isActive()) {
+                                var visibleState = {
+                                    visible: mask(state, fields),
+                                    dices: state.players[i].dices
+                                };
+                            }
                             games[game].clients[i].emit('newMessage', {
                                 code: 1,
-                                value: { status: "OK", player: games[game].players[i], index: i, gameID: game }
+                                value: { status: "OK", player: games[game].players[i], index: i, gameID: game, state: visibleState }
                             });
                             games[game].players[i].socket = games[game].clients[i];
                             fs.appendFile("log.txt", time() + "Game #" + game + "; Player " + i + " is playing" + "\n", (err) => {
                                 if (err) throw err;
                             });
                         }
-                        games[game].guess = new Guess(1,0);
                         fs.appendFile("log.txt", time() + "Game #" + game + "; Game started, state: " + printState(game) + "\n", (err) => {
                             if (err) throw err;
                         });
                         activeGames++;
                         games[game].newTurn = true;
-                        Game.game(games[game].players);
+                        Game.game(games[game]);
                     }
                 }
                 break;
@@ -270,7 +301,6 @@ io.on('connection', (socket)=>{
                                 code: 5,
                                 value: "roll"
                             });
-                            games[newMessage.value.gameID].players[num].wannaRoll2(newMessage.value.answer);
                         }
                         break;
                     case "show":
@@ -289,10 +319,6 @@ io.on('connection', (socket)=>{
                             socket.emit('newMessage', {
                                 code: 5,
                                 value: "show"
-                            });
-                            socket.emit('newMessage', {
-                                code: 2,
-                                value: "OK, you don't have to."
                             });
                         }
                         break;
@@ -355,7 +381,7 @@ io.on('connection', (socket)=>{
                                 } else {
                                     output += "aren't " + games[newMessage.value.gameID].guess.count + " dices ";
                                 }
-                                output += "with value " + games[newMessage.value.gameID].guess.value + "? (yes/no)";
+                                output += "with value " + games[newMessage.value.gameID].guess.value + "?";
                                 socket.emit('newMessage', {
                                     code: 3,
                                     value: {
@@ -371,7 +397,7 @@ io.on('connection', (socket)=>{
                             } else {
                                 output += "aren't " + games[newMessage.value.gameID].guess.count + " dices ";
                             }
-                            output += "with value " + games[newMessage.value.gameID].guess.value + "? (yes/no)";
+                            output += "with value " + games[newMessage.value.gameID].guess.value + "?";
                             socket.emit('newMessage', {
                                 code: 3,
                                 value: {
@@ -393,7 +419,7 @@ io.on('connection', (socket)=>{
                             socket.emit('newMessage', {
                                 code:3,
                                 value: {
-                                    message: "Do you wanna raise? (yes/no)",
+                                    message: "Do you wanna raise?",
                                     continue: "play1",
                                     args: {}
                                 }
@@ -428,14 +454,15 @@ io.on('connection', (socket)=>{
                     case "addIndex":
                         if (!Player.addIndex(newMessage.value.num-1, newMessage.value.args.ind)) {
                             socket.emit('newMessage', {
-                                code: 4,
+                                code: 2,
+                                value: "You have already chosen that dice. Please choose another."
+                            })
+                            socket.emit('newMessage', {
+                                code: 7,
                                 value: {
-                                    message: "You have already chosen that dice. Please enter another index. (1-" + games[newMessage.value.gameID].players[num].dices.length + ")",
-                                    alert: "Sorry, that's not a valid index. Try again.",
-                                    bigger: 0,
-                                    smaller: games[newMessage.value.gameID].players[num].getDices().length,
-                                    args: { ind: newMessage.value.args.ind, n: newMessage.value.args.n, use: newMessage.value.args.use },
-                                    continue: "addIndex"
+                                    dices: games[newMessage.value.gameID].players[num].dices,
+                                    visibleDices: games[newMessage.value.gameID].players[num].visibleDices,
+                                    args: newMessage.value.args
                                 }
                             });
                         } else {
@@ -530,7 +557,7 @@ io.on('connection', (socket)=>{
                                 socket.emit('newMessage', {
                                     code: 3,
                                     value: {
-                                        message: "So you can enter 1 as a value in the next step. Do you want to do that? (yes/no)",
+                                        message: "So you can enter 1 as a value in the next step. Do you want to do that?",
                                         continue: "raiseOne",
                                         num: newMessage.value.num
                                     }
@@ -557,7 +584,7 @@ io.on('connection', (socket)=>{
                                 socket.emit('newMessage', {
                                     code: 3,
                                     value: {
-                                        message: "So you can enter 1 as a value in the next step. Do you want to do that? (yes/no)",
+                                        message: "So you can enter 1 as a value in the next step. Do you want to do that?",
                                         continue: "raiseOne",
                                         num: newMessage.value.num
                                     }
@@ -627,7 +654,7 @@ io.on('connection', (socket)=>{
                                 socket.emit('newMessage', {
                                     code: 3,
                                     value: {
-                                        message: "Do you want to change the number? (yes/no)",
+                                        message: "Do you want to change the number?",
                                         continue: "raiseTwo",
                                         num: newMessage.value.args
                                     }
@@ -642,6 +669,15 @@ io.on('connection', (socket)=>{
                                     code: 5,
                                     value: "raise"
                                 });
+                                var num;
+                                var it = 0;
+                                games[newMessage.value.gameID].clients.forEach((s)=> {
+                                    if (s==socket) {
+                                        num = it;
+                                    }
+                                    it++;
+                                });
+                                games[newMessage.value.gameID].guesses[num] = games[newMessage.value.gameID].guess;
                                 break;
                         }
                         break;
@@ -664,7 +700,7 @@ io.on('connection', (socket)=>{
                                 if (err) throw err;
                             });
                             makeState(newMessage.value.gameID);
-                            var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
+                            var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
                             var i = 0;
                             games[newMessage.value.gameID].clients.forEach((s) => {
                                 if (games[newMessage.value.gameID].players[i].isActive()) {
@@ -691,11 +727,28 @@ io.on('connection', (socket)=>{
                             }
                             it++;
                         });
+                        makeState(newMessage.value.gameID);
+                        var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
+                        var i = 0;
+                        games[newMessage.value.gameID].clients.forEach((s) => {
+                            if (games[newMessage.value.gameID].players[i].isActive()) {
+                                var visibleState = {
+                                    visible: mask(state, fields),
+                                    dices: state.players[i].dices
+                                };
+                                visibleState.visible.index--;
+                                s.emit('newMessage', {
+                                    code: 6,
+                                    value: visibleState
+                                });
+                            }
+                            i++;
+                        });
                         games[newMessage.value.gameID].players[num].raise();
                         break;
                     case "raise":
                         makeState(newMessage.value.gameID);
-                        var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
+                        var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
                         var i = 0;
                         games[newMessage.value.gameID].clients.forEach((s) => {
                             if (games[newMessage.value.gameID].players[i].isActive()) {
@@ -717,7 +770,47 @@ io.on('connection', (socket)=>{
                         fs.appendFile("log.txt", time() + "Game #" + newMessage.value.gameID + "; New round, state: " + printState(newMessage.value.gameID) + "\n", (err) => {
                             if (err) throw err;
                         });
+                        for (var i=0; i<games[newMessage.value.gameID].players.length; i++) {
+                            games[newMessage.value.gameID].guesses[i] = new Guess("-", "-");
+                        }
+                        makeState(newMessage.value.gameID);
+                            var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
+                            var i = 0;
+                            games[newMessage.value.gameID].clients.forEach((s) => {
+                                if (games[newMessage.value.gameID].players[i].isActive()) {
+                                    var visibleState = {
+                                        visible: mask(state, fields),
+                                        dices: state.players[i].dices
+                                    };
+                                    s.emit('newMessage', {
+                                        code: 6,
+                                        value: visibleState
+                                    });
+                                }
+                                i++;
+                            });
                         Game.nextTurn(games[newMessage.value.gameID]);
+                        break;
+                    case "leader":
+                        var rank = -1;
+                        for (var i=9; i>=0; i--) {
+                            if (leaderboard[i].realScore<newMessage.value.args.player.length) {
+                                rank = i;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (rank!=-1) {
+                            var leader = {
+                                name: newMessage.value.args.name,
+                                score: newMessage.value.args.player.length,
+                                realScore: newMessage.value.args.player.length
+                            };
+                            for (var i=8; i>=rank; i--) {
+                                leaderboard[i+1] = leaderboard[i];
+                            }
+                            leaderboard[rank] = leader;
+                        }
                         break;
                 }
                 break;
@@ -752,7 +845,7 @@ io.on('connection', (socket)=>{
                     if (err) throw err;
                 });
                 makeState(index);
-                var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,guess,players(active,visibleDices)';
+                var fields = 'numOfPlayers,numOfDices,numOfVisibleDices,index,guess,guesses,players(active,visibleDices,numOfDices,name)';
                 var i = 0;
                 games[index].clients.forEach((s) => {
                     if (games[index].players[i].isActive()) {
