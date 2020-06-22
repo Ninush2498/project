@@ -4,11 +4,43 @@
 
 <title id="player">Welcome</title>
 
-<button onclick="pravidla()">How to play</button>
+<button onclick="pravidla()" style="position: fixed;bottom: 50px;right: 50px;">How to play</button>
 
-<button onclick="login()">Login with Facebook</button>
+<p><button id="btn" onclick="login()">Login</button></p>
 
 <p id="paragraph">Welcome to the game! To start please log in.</p>
+
+<style>
+    table {
+        font-family: sans-serif;
+        border-collapse: collapse;
+        width: 20%;
+    }
+    
+    td, th {
+        border: 1px solid black;
+        text-align: left;
+        padding: 8px;
+    }
+    
+    tr:nth-child(even) {
+        background-color: #dddddd;
+    }
+
+    button {
+        color: white;
+        background-color: black;
+        height: 45px;
+        width: 90px;
+        border-radius: 12%;
+    }
+</style>
+
+<table id="tab" style="position: fixed;top: 50px;right: 150px;">
+    <tr>
+      <th style="font-variant: small-caps;text-align: center;" colspan="2">Leaderboard</th>
+    </tr>
+</table>
 
 <script src="/socket.io/socket.io.js"></script>
 
@@ -25,9 +57,22 @@
         console.log(message);
         switch(message.code) {
             case 0: //other code not expected
-                port = message.value.PORT;
-                host = message.value.HOST;
-                var redirect = "http://";
+                port = message.value.env.PORT;
+                host = message.value.env.HOST;
+                var leaderboard = message.value.leaderboard;
+                for (var i=0; i<10; i++) {
+                    var row = document.createElement("tr");
+                    var c1 = document.createElement("td");
+                    var c2 = document.createElement("td");
+                    c1.textContent = (i+1) + ". " + leaderboard[i].name;
+                    c2.textContent = leaderboard[i].score;
+                    c2.style = "text-align: center;";
+                    row.appendChild(c1);
+                    row.appendChild(c2);
+                    document.getElementById("tab").appendChild(row);
+                }
+
+                /*var redirect = "http://";
                     if (host == "localhost") {
                         redirect += host + ":" + port + "/newGame";
                     } else {
@@ -38,13 +83,11 @@
                     redirect_uri: redirect,
                     scope: ['id', 'first_name', 'picture'].join(','),
                     response_type: 'code',
-                    //state: "{a:abc, b:123}"
+                    //state: "{a:abc, b:123}" //???
                     //auth_type: 'rerequest',
                     //display: 'popup',
-                    });
-
-                    facebookLoginUrl = `https://www.facebook.com/v7.0/dialog/oauth?${stringifiedParams}`;
-
+                });
+                facebookLoginUrl = `https://www.facebook.com/v7.0/dialog/oauth?${stringifiedParams}`;*/
                 break;
         }
     });
@@ -54,7 +97,37 @@
             setTimeout(login, 100);
         }
         location.replace(facebookLoginUrl);*/
-        location.replace("http://localhost:3000/newGame");
+        var btn = document.getElementById("btn").hidden = true;
+        var f = document.createElement("div");
+        var b = document.createElement("button");
+        var t = document.createElement("p");
+        t.textContent = "Enter your name:";
+        b.type = "submit";
+        b.style = "height: 20px; width: 60px; margin: 5px;";
+        b.innerHTML = "Submit";
+        var s = document.createElement("input");
+        f.appendChild(t);
+        f.appendChild(s);
+        f.appendChild(b);
+        var x;
+        b.onclick = function () {
+            x = s.value;
+            if (x.length<3 || x.length>10) {
+                alert("Your name should be between 3 and 10 characters.");
+                f.parentElement.removeChild(f);
+                login();
+            } else {
+                f.parentElement.removeChild(f);
+                sessionStorage.setItem("name", x);
+                location.replace("http://localhost:3000/newGame");
+            }
+        };
+        s.addEventListener("keypress", function(event) {
+            if (event.keyCode == 13) {
+                b.click();
+            }
+        });
+        document.getElementsByTagName("body")[0].appendChild(f);
     }
 
     function pravidla() {
