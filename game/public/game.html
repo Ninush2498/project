@@ -2,11 +2,47 @@
 <html>
 <body>
 
-<title id="player"></title>
+<title id="player">Join game</title>
 
-<button onclick="pravidla()">How to play</button>
+<style>
+    table {
+        font-family: sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+    }
+    
+    td, th {
+        border: 0px;
+        text-align: center;
+        padding: 8px;
+        width: 100px;
+    }
 
-<p id="paragraph">Wait please.</p>
+    th {
+        font-variant: small-caps;
+    }
+
+    button {
+        color: white;
+        background-color: black;
+        height: 45px;
+        width: 90px;
+        border-radius: 12%;
+    }
+</style>
+
+
+<table id="t" style="position: static;"></table>
+
+<table id="me" style="position: relative;top: 100px;"></table>
+
+<p id="paragraph" style="position: relative;top: 100px;text-align: center;">Wait please.</p>
+
+<table id="lastGuess" style="position: fixed;bottom: 50px; left: 50px;width: 20%;"></table>
+
+<button onclick="pravidla()" style="position: fixed;bottom: 50px;right: 50px;">How to play</button>
+
+<button id="end" style="position: fixed;bottom: 150px;left: 50px;visibility: hidden;">Logout</button>
 
 <script src="public/Game.js"></script>
 
@@ -28,15 +64,18 @@
         }
     }
 
-    //if (typeof sessionStorage.getItem("connected") === "undefined") {location.replace();}
+    function logout() {
+        sessionStorage.clear();
+        if (host == "localhost") {
+            location.replace(`http://${host + ":" + port}/`);
+        } else {
+            location.replace(`${host}/`);
+        }
+    }
 
     var socket=io();
     var player;
 
-    socket.emit('createMessage', {
-        code: "join",
-        value: null //neskor info o hracovi
-    });
 
     function printState(str) {
         var state = str.visible;
@@ -87,7 +126,7 @@
 
 
     socket.on('connect', function(){
-        console.log('Connected to Server');  
+        console.log('Connected to Server');
     }); 
 
 
@@ -95,16 +134,228 @@
         console.log(message);
         switch(message.code) {
             case 0:
-                host = message.value.HOST;
-                port = message.value.PORT;
+                host = message.value.env.HOST;
+                port = message.value.env.PORT;
+                var name = sessionStorage.getItem("name");
+                if (name == null) {
+                    var addr;
+                    if (host == "localhost") {
+                        addr = `http://${host + ":" + port}/`;
+                    } else {
+                        addr = `${host}/`;
+                    }
+                    console.log(addr);
+                    location.replace(addr);
+                } else {
+                    socket.emit('createMessage', {
+                        code: "join",
+                        value: name
+                    });
+                }
                 break;
             case 1:
                 if (message.value.status=="OK") {
                     sessionStorage.setItem("gameID", message.value.gameID);
                     sessionStorage.setItem("playerID", message.value.index);
-                    document.getElementById("player").innerHTML = "Player " + (message.value.index+1);
+                    document.getElementById("player").innerHTML = sessionStorage.getItem("name");
                     document.getElementById("paragraph").innerHTML = "";
                     player = message.value.player;
+                    
+                    var tab = document.getElementById("t");
+                    var state = message.value.state.visible;
+                    var me;
+                    var row = document.createElement("tr");
+                    row.id = "name";
+                    if (state.index < state.players.length-1) {
+                        state.index++;
+                    } else {
+                        state.index = 0;
+                    }
+                    while(!state.players[state.index].active) {
+                        if (state.index < state.players.length-1) {
+                            state.index++;
+                        } else {
+                            state.index = 0;
+                        }
+                    }
+                    for (var j=0; j<state.numOfPlayers; j++) {
+                        if (state.players[j].name==sessionStorage.getItem("name")) {
+                            me = j;
+                        } else {
+                            var c = document.createElement("th");
+                            c.colSpan = 2;
+                            c.id = row.id + j;
+                            if (state.index==j) {
+                                c.style = "font-weight: bold;";
+                            } else {
+                                c.style = "font-weight: normal;";
+                            }
+                            c.textContent = state.players[j].name;
+                            row.appendChild(c);
+                        }
+                    }
+                    tab.appendChild(row);
+                    row = document.createElement("tr");
+                    row.id = "dices";
+                    for (var j=0; j<state.numOfPlayers; j++) {
+                        if (j!=me) {
+                            var c = document.createElement("td");
+                            c.colSpan = 2;
+                            c.id = row.id + j;
+                            c.textContent = state.players[j].numOfDices;
+                            row.appendChild(c);
+                        }
+                    }
+                    tab.appendChild(row);
+                    row = document.createElement("tr");
+                    row.id = "visible";
+                    for (var j=0; j<state.numOfPlayers; j++) {
+                        if (j!=me) {
+                            var c = document.createElement("td");
+                            c.colSpan = 2;
+                            c.id = row.id + j;
+                            for (var i=0; i<state.players[j].visibleDices.length; i++) {
+                                var img = document.createElement("img");
+                                img.style = "margin: 2px;";
+                                img.height = 30;
+                                img.width = 30;
+                                if (state.players[j].visibleDices[i]!=0) {
+                                    img.src = "public/" + state.players[j].visibleDices[i] + ".png";
+                                    c.appendChild(img);
+                                }
+                            }
+                            row.appendChild(c);
+                        }
+                    }
+                    tab.appendChild(row);
+                    row = document.createElement("tr");
+                    row.id = "guess";
+                    for (var j=0; j<state.numOfPlayers; j++) {
+                        if (j!=me) {
+                            var c1 = document.createElement("td");
+                            var c2 = document.createElement("td");
+                            var img = document.createElement("img");
+                            img.id = "img" + j;
+                            img.height = 30;
+                            img.width = 30;
+                            c1.id = "1" + row.id + j;
+                            c1.style = "text-align: right;";
+                            c2.id = "2" + row.id + j;
+                            c2.style = "text-align: left;";
+                            var text = "Last guess: ";
+                            c2.appendChild(img);
+                            if (state.guesses[j].count == "-") {
+                                c1.textContent = text + state.guesses[j].count + " " + state.guesses[j].value;
+                                img.style = "visibility: hidden;";
+                            } else {
+                                c1.textContent = text + state.guesses[j].count + "x";
+                                img.src = "public/" + state.guesses[j].value + ".png";
+                                img.style = "visibility: visible;";
+                            }
+                            row.appendChild(c1);
+                            row.appendChild(c2);
+                        }
+                    }
+                    tab.appendChild(row);
+
+                    var tabMe = document.getElementById("me");
+                    row = document.createElement("tr");
+                    var c = document.createElement("td");
+                    c.colSpan = 2;
+                    c.id = "myVisible";
+                    for (var i=0; i<state.players[me].visibleDices.length; i++) {
+                        var img = document.createElement("img");
+                        img.style = "margin: 2px;";
+                        img.height = 30;
+                        img.width = 30;
+                        if (state.players[me].visibleDices[i]!=0) {
+                            img.src = "public/" + state.players[me].visibleDices[i] + ".png";
+                            c.appendChild(img);
+                        }
+                    }
+                    row.appendChild(c);
+                    tabMe.appendChild(row);
+                    row = document.createElement("tr");
+                    c = document.createElement("td");
+                    c.colSpan = 2;
+                    c.id = "myDices";
+                    for (var i=0; i<message.value.state.dices.length; i++) {
+                        if (state.players[me].visibleDices[i]==0) {
+                            var img = document.createElement("img");
+                            img.style = "margin: 2px;";
+                            img.height = 40;
+                            img.width = 40;
+                            if (state.players[me].visibleDices[i]==0) {
+                                img.src = "public/" + message.value.state.dices[i] + ".png";
+                                c.appendChild(img);
+                            }
+                        }
+                    }
+                    row.appendChild(c);
+                    tabMe.appendChild(row);
+                    row = document.createElement("tr");
+                    var c1 = document.createElement("td");
+                    var c2 = document.createElement("td");
+                    var img = document.createElement("img");
+                    img.id = "myImg";
+                    img.height = 30;
+                    img.width = 30;
+                    c1.id = "1myGuess";
+                    c1.style = "text-align: right;";
+                    c2.id = "2myGuess";
+                    c2.style = "text-align: left;";
+                    var text = "Last guess: ";
+                    c2.appendChild(img);
+                    if (state.guesses[me].count == "-") {
+                        c1.textContent = text + state.guesses[me].count + " " + state.guesses[me].value;
+                        img.style = "visibility: hidden;";
+                    } else {
+                        c1.textContent = text + state.guesses[me].count + "x";
+                        img.src = "public/" + state.guesses[me].value + ".png";
+                        img.style = "visibility: visible;";
+                    }
+                    row.appendChild(c1);
+                    row.appendChild(c2);
+                    tabMe.appendChild(row);
+                    row = document.createElement("tr");
+                    c = document.createElement("th");
+                    c.colSpan = 2;
+                    c.id = "myName";
+                    if (state.index==me) {
+                        c.style = "font-weight: bold;font-size: 30px;";
+                    } else {
+                        c.style = "font-weight: normal;font-size: 30px;";
+                    }
+                    c.textContent = "You";
+                    row.appendChild(c);
+                    tabMe.appendChild(row);
+
+                    var lastGuess = document.getElementById("lastGuess");
+                    row = document.createElement("tr");
+                    row.style = "border: 5px solid black";
+                    c1 = document.createElement("td");
+                    c2 = document.createElement("td");
+                    var img = document.createElement("img");
+                    img.id = "imgGuess";
+                    img.height = 30;
+                    img.width = 30;
+                    c1.id = "1lastGuess";
+                    c1.style = "text-align: right;";
+                    c2.id = "2lastGuess";
+                    c2.style = "text-align: left;";
+                    var text = "Last guess: ";
+                    c2.appendChild(img);
+                    if (state.guess.value == 0) {
+                        c1.textContent = text + "- -";
+                        img.style = "visibility: hidden;";
+                    } else {
+                        c1.textContent = text + state.guess.count + "x";
+                        img.src = "public/" + state.guess.value + ".png";
+                        img.style = "visibility: visible;";
+                    }
+                    row.appendChild(c1);
+                    row.appendChild(c2);
+                    lastGuess.appendChild(row);
                 } else {
                     alert("Sorry, there is no active game. Please start a new one.");
                     if (host == "localhost") {
@@ -115,9 +366,18 @@
                 }
                 break;
             case 2:
-                document.getElementById("paragraph").innerHTML += message.value + "<br/>";
-                if (message.value=="Congratulations, you won!") {
-                    alert("Game ends");
+                if (message.value=="New round") {
+                    alert(message.value);
+                } else {
+                    if (message.value=="Congratulations, you won!") {
+                        alert("Game ends");
+                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
+                        document.getElementById("end").onclick = logout;
+                    } else if (message.value=="Game over :(") {
+                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
+                        document.getElementById("end").onclick = logout;
+                    }
+                    document.getElementById("paragraph").innerHTML += message.value + "<br/>";
                 }
                 break;
             case 3:
@@ -126,59 +386,214 @@
                 Game.nextBoolean(b, socket, message.value.continue, message.value.num, sessionStorage.getItem("gameID"));
                 break;
             case 4:
-            document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
-                    var n = new Number();
-                    var callback = Game.send;
-                    var f;
-                    var args;
-                    var smaller;
-                    var bigger;
-                    if (message.value.smaller=="neg") {
-                        smaller = Number.NEGATIVE_INFINITY;
-                    } else if (message.value.smaller=="pos") {
-                        smaller = Number.POSITIVE_INFINITY;
-                    } else {
-                        smaller = message.value.smaller;
-                    }
-                    if (message.value.bigger=="neg") {
-                        bigger = Number.NEGATIVE_INFINITY;
-                    } else if (message.value.bigger=="pos") {
-                        bigger = Number.POSITIVE_INFINITY;
-                    } else {
-                        bigger = message.value.bigger;
-                    }
-                    switch(message.value.continue) {
-                        case "send":
-                            f = "rollAtBeginning";
-                            args = null;
-                            break;
-                        case "addIndex":
-                            f = "addIndex";
-                            args = message.value.args;
-                            break;
-                        case "show":
-                            f = "show";
-                            args = null;
-                            break;
-                        case "raise1":
-                            f = "raise1";
-                            args = null;
-                            break;
-                        case "raise2":
-                            f = "raise2";
-                            args = message.value.args;
-                            break;
-                    }
-                    Game.nextInteger(n, bigger, smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args, gameID: sessionStorage.getItem("gameID") });
-                    break;
+                document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
+                var n = new Number();
+                var callback = Game.send;
+                var f;
+                var args;
+                var smaller;
+                var bigger;
+                if (message.value.smaller=="neg") {
+                    smaller = Number.NEGATIVE_INFINITY;
+                } else if (message.value.smaller=="pos") {
+                    smaller = Number.POSITIVE_INFINITY;
+                } else {
+                    smaller = message.value.smaller;
+                }
+                if (message.value.bigger=="neg") {
+                    bigger = Number.NEGATIVE_INFINITY;
+                } else if (message.value.bigger=="pos") {
+                    bigger = Number.POSITIVE_INFINITY;
+                } else {
+                    bigger = message.value.bigger;
+                }
+                switch(message.value.continue) {
+                    case "send":
+                        f = "rollAtBeginning";
+                        args = null;
+                        break;
+                    case "addIndex":
+                        f = "addIndex";
+                        args = message.value.args;
+                        break;
+                    case "show":
+                        f = "show";
+                        args = null;
+                        break;
+                    case "raise1":
+                        f = "raise1";
+                        args = null;
+                        break;
+                    case "raise2":
+                        f = "raise2";
+                        args = message.value.args;
+                        break;
+                }
+                Game.nextInteger(n, bigger, smaller, message.value.alert, callback, { socket: socket, value: n, function: f, args: args, gameID: sessionStorage.getItem("gameID") });
+                break;
             case 5:
+                var args = {};
+                if (typeof message.value.winner !== "undefined") {
+                    args.player = message.value.winner;
+                    args.name = sessionStorage.getItem("name");
+                    message.value = "leader";
+                }
                 socket.emit('createMessage', {
                     code: "update",
-                    value: { value: message.value, gameID: sessionStorage.getItem("gameID") }
+                    value: { value: message.value, gameID: sessionStorage.getItem("gameID"), args: args  }
                 });
                 break;
             case 6:
-                document.getElementById("paragraph").innerHTML += printState(message.value) + "<br/>";
+                var tab = document.getElementById("t");
+                var state = message.value.visible;
+                var me;
+                var row = document.getElementById("name");
+                if (state.index < state.players.length-1) {
+                    state.index++;
+                } else {
+                    state.index = 0;
+                }
+                while(!state.players[state.index].active) {
+                    if (state.index < state.players.length-1) {
+                        state.index++;
+                    } else {
+                        state.index = 0;
+                    }
+                }
+                for (var j=0; j<state.numOfPlayers; j++) {
+                    if (state.players[j].name==sessionStorage.getItem("name")) {
+                        me = j;
+                    } else {
+                        var c = document.getElementById(row.id + j);
+                        if (state.index==j) {
+                            c.style = "font-weight: bold;";
+                        } else {
+                            c.style = "font-weight: normal;";
+                        }
+                        c.textContent = state.players[j].name;
+                    }
+                }
+                row = document.getElementById("dices");
+                for (var j=0; j<state.numOfPlayers; j++) {
+                    if (j!=me) {
+                        var c = document.getElementById(row.id + j);
+                        c.textContent = state.players[j].numOfDices;
+                    }
+                }
+                row = document.getElementById("visible");
+                for (var j=0; j<state.numOfPlayers; j++) {
+                    if (j!=me) {
+                        var c = document.getElementById(row.id + j);
+                        c.textContent = "";
+                        for (var i=0; i<state.players[j].visibleDices.length; i++) {
+                            var img = document.createElement("img");
+                            img.style = "margin: 2px;";
+                            img.height = 30;
+                            img.width = 30;
+                            if (state.players[j].visibleDices[i]!=0) {
+                                img.src = "public/" + state.players[j].visibleDices[i] + ".png";
+                                c.appendChild(img);
+                            }
+                        }
+                    }
+                }
+                row = document.getElementById("guess");
+                for (var j=0; j<state.numOfPlayers; j++) {
+                    if (j!=me) {
+                        var c1 = document.getElementById("1" + row.id + j);
+                        var c2 = document.getElementById("2" + row.id + j);
+                        var img = document.getElementById("img" + j);
+                        var text = "Last guess: ";
+                        if (state.guesses[j].count == "-") {
+                            c1.textContent = text + state.guesses[j].count + " " + state.guesses[j].value;
+                            img.style = "visibility: hidden;";
+                        } else {
+                            c1.textContent = text + state.guesses[j].count + "x";
+                            img.src = "public/" + state.guesses[j].value + ".png";
+                            img.style = "visibility: visible;";
+                        }
+                    }
+                }
+
+                c = document.getElementById("myVisible");
+                c.textContent = "";
+                for (var i=0; i<state.players[me].visibleDices.length; i++) {
+                    var img = document.createElement("img");
+                    img.style = "margin: 2px;";
+                    img.height = 30;
+                    img.width = 30;
+                    if (state.players[me].visibleDices[i]!=0) {
+                        img.src = "public/" + state.players[me].visibleDices[i] + ".png";
+                        c.appendChild(img);
+                    }
+                }
+                c = document.getElementById("myDices");
+                c.textContent = "";
+                for (var i=0; i<message.value.dices.length; i++) {
+                    if (state.players[me].visibleDices[i]==0) {
+                        var img = document.createElement("img");
+                        img.style = "margin: 2px;";
+                        img.height = 40;
+                        img.width = 40;
+                        if (state.players[me].visibleDices[i]==0) {
+                            img.src = "public/" + message.value.dices[i] + ".png";
+                            c.appendChild(img);
+                        }
+                    }
+                }
+                var c1 = document.getElementById("1myGuess");
+                var img = document.getElementById("myImg");
+                var text = "Last guess: ";
+                if (state.guesses[me].count == "-") {
+                    c1.textContent = text + state.guesses[me].count + " " + state.guesses[me].value;
+                    img.style = "visibility: hidden;";
+                } else {
+                    c1.textContent = text + state.guesses[me].count + "x";
+                    img.src = "public/" + state.guesses[me].value + ".png";
+                    img.style = "visibility: visible;";
+                }
+                c = document.getElementById("myName");
+                if (state.index==me) {
+                    c.style = "font-weight: bold;font-size: 30px;";
+                } else {
+                    c.style = "font-weight: normal;font-size: 30px;";
+                }
+
+                c1 = document.getElementById("1lastGuess");
+                var img = document.getElementById("imgGuess");
+                var text = "Last guess: ";
+                if (state.guess.value == 0) {
+                    c1.textContent = text + "- -";
+                    img.style = "visibility: hidden;";
+                } else {
+                    c1.textContent = text + state.guess.count + "x";
+                    img.src = "public/" + state.guess.value + ".png";
+                    img.style = "visibility: visible;";
+                }
+                break;
+            case 7:
+                var c = document.getElementById("myDices");
+                c.textContent = "";
+                for (var i=0; i<message.value.dices.length; i++) {
+                    if (message.value.visibleDices[i]==0) {
+                        var img = document.createElement("img");
+                        img.index = i;
+                        img.onclick = function() {
+                            document.getElementById("paragraph").innerHTML = "";
+                            var num = new Number();
+                            num.value = this.index+1;
+                            var args = { socket: socket, value: num, function: "addIndex", args: message.value.args, gameID: sessionStorage.getItem("gameID") };
+                            Game.send(args);
+                        }
+                        img.style = "margin: 2px;";
+                        img.height = 40;
+                        img.width = 40;
+                        if (message.value.visibleDices[i]==0) {
+                            img.src = "public/" + message.value.dices[i] + ".png";
+                            c.appendChild(img);
+                        }
+                    }
+                }
                 break;
         }
     });
