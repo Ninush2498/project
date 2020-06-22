@@ -39,7 +39,6 @@ class Player {
                 this.dices[i] = Math.floor(Math.random()*6)+1;
             }
         }
-        this.wannaRoll2();
         this.socket.emit('newMessage', {
             code: 5,
             value: "roll"
@@ -47,6 +46,8 @@ class Player {
     }
     
     static addIndex(index, indices) {
+        console.log(index);
+        console.log(indices);
         if (!indices[index]) {
             indices[index] = true;
             return true;
@@ -80,19 +81,21 @@ class Player {
             var self = this;
             var m;
             if(use=="show") {
-                m = "Enter the index of the dice you wanna show. (1-" + self.dices.length + ")";
+                m = "Click the dice you wanna show.";
             } else {
-                m = "Enter the index of the dice you wanna roll again. (1-" + self.dices.length + ")";
+                m = "Click the dice you wanna roll again.";
             }
+            var player = this;
             this.socket.emit('newMessage', {
-                code: 4,
+                code: 2,
+                value: m
+            })
+            this.socket.emit('newMessage', {
+                code: 7,
                 value: {
-                    message: m,
-                    alert: "Sorry, that's not a valid index. Try again.",
-                    bigger: 0,
-                    smaller: self.getDices().length,
-                    args: { ind: indices, n: n-1, use: use },
-                    continue: "addIndex"
+                    dices: player.dices,
+                    visibleDices: player.visibleDices,
+                    args: { ind: indices, n: n-1, use: use }
                 }
             });
         } else {
@@ -107,7 +110,6 @@ class Player {
     rollAtBeginning(n) {
         if (n==this.dices.length) {
             this.roll1();
-            this.wannaRoll2()
             this.socket.emit('newMessage', {
                 code: 5,
                 value: "roll"
@@ -118,28 +120,12 @@ class Player {
     }
     
     wannaRoll() {
-        this.wannaRoll2();
         this.socket.emit('newMessage', {
             code: 3,
             value: {
-                message: "Wanna roll any of your dices before the game? (yes/no)",
+                message: "Wanna roll any of your dices before the game?",
                 continue: "wannaRoll"
             }
-        });
-    }
-
-    wannaRoll2() {
-        this.socket.emit('newMessage', {
-            code: 2,
-            value: "Your dices:"
-        });
-        var output = "";
-        for (var d of this.getDices()) {
-            output += d + " ";
-        }
-        this.socket.emit('newMessage', {
-            code: 2,
-            value: output
         });
     }
     
@@ -305,7 +291,7 @@ class Player {
             for (var i=0; i<this.dices.length-number; i++) {
                 newDices[i] = this.dices[i];
             }
-            this.dices = newDices;        
+            this.dices = newDices;     
         } else {
             this.gameOver();
         }
@@ -346,7 +332,6 @@ class Player {
             }
         }
         this.visibleDices = vis;
-        this.wannaRoll2();
         this.socket.emit('newMessage', {
             code: 5,
             value: "show"
@@ -360,7 +345,6 @@ class Player {
             if (n!=0) {
                 this.getIndices("show", n, this.visibleDices, null);
             } else {
-                this.wannaRoll2();
                 this.socket.emit('newMessage', {
                     code: 5,
                     value: "show"
@@ -373,7 +357,7 @@ class Player {
         this.socket.emit('newMessage', {
             code: 3,
             value: {
-                message: "Do you wanna show some dices and roll the rest? (yes/no)",
+                message: "Do you wanna show some dices and roll the rest?",
                 continue: "show"
             }
         });
@@ -381,32 +365,9 @@ class Player {
     
     play(p, guess) {
         this.socket.emit('newMessage', {
-            code:2,
-            value:  "Last guess: " + guess.count + " " + guess.value
-        });
-        this.wannaRoll2();
-        this.socket.emit('newMessage', {
-            code:2,
-            value: "Visible dices of other players:"
-        });
-        var output = "";
-        for (var pl of p) {
-            if (pl!=this) {
-                for (var d of pl.visibleDices) {
-                    if (d!=0) {
-                        output += d + " ";
-                    }
-                }
-            }
-        }
-        this.socket.emit('newMessage', {
-            code:2,
-            value: output
-        });
-        this.socket.emit('newMessage', {
             code:3,
             value: {
-                message: "Do you wanna raise? (yes/no)",
+                message: "Do you wanna raise?",
                 continue: "play1",
                 args: {}
             }
