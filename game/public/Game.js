@@ -42,23 +42,30 @@ class Game {
     static nextInteger(num, bigger, smaller, message, next, args) {
         var f = document.createElement("div");
         var b = document.createElement("button");
+        var t = document.createElement("p");
         b.type = "submit";
         b.style = "height: 20px; width: 60px; margin: 5px;";
         b.innerHTML = "Submit";
         var s = document.createElement("input");
+        f.appendChild(t);
         f.appendChild(s);
         f.appendChild(b);
         var x;
         b.onclick = function () {
             x = s.value;
             if (!Number.isInteger(Number(x))) {
-                alert("Must input integer.");
-                f.parentElement.removeChild(f);
-                Game.nextInteger(num, bigger, smaller, message, next, args);
+                t.textContent = "(Must input integer.)";
+                s.value = "";
             } else {
-                f.parentElement.removeChild(f);
                 num.value = Number(x);
-                Game.check(num, bigger, smaller, message, next, args);
+                if (num.value <= bigger || num.value > smaller) {
+                    t.textContent = "(" + message + ")";
+                    s.value = "";
+                } else {
+                    f.parentElement.removeChild(f);
+                    document.getElementById("paragraph").innerHTML = "";
+                    next(args);
+                }
             }
         };
         s.addEventListener("keypress", function(event) {
@@ -157,16 +164,6 @@ class Game {
         Game.newGame(game);
     }
 
-    static check(num, bigger, smaller, message, next, args) {
-        if (num.value <= bigger || num.value > smaller) {
-            alert(message);
-            Game.nextInteger(num, bigger, smaller, message, next, args);
-        } else {
-            document.getElementById("paragraph").innerHTML = "";
-            next(args);
-        }
-    }
-
     static send(args) {
         console.log(args);
         args.socket.emit('createMessage', {
@@ -187,7 +184,6 @@ class Game {
         } else {
             document.getElementById("paragraph").innerHTML = "Game";
         }
-        alert("Game starts");
     }
 
     static continue(args) {
