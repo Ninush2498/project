@@ -357,27 +357,25 @@
                     row.appendChild(c2);
                     lastGuess.appendChild(row);
                 } else {
-                    alert("Sorry, there is no active game. Please start a new one.");
-                    if (host == "localhost") {
-                        location.replace(`http://${host + ":" + port}/newGame`);
-                    } else {
-                        location.replace(`${host}/newGame`);
+                    var p = document.getElementById("paragraph");
+                    p.innerHTML = "Sorry, there is no active game. Please start a new one. <br/> <br/>";
+                    var bb = document.createElement("button");
+                    bb.textContent = "Go back";
+                    bb.onclick = function() {
+                        if (host == "localhost") {
+                            location.replace(`http://${host + ":" + port}/newGame`);
+                        } else {
+                            location.replace(`${host}/newGame`);
+                        }
                     }
+                    p.appendChild(bb);
                 }
                 break;
             case 2:
-                if (message.value=="New round") {
-                    alert(message.value);
-                } else {
-                    if (message.value=="Congratulations, you won!") {
-                        alert("Game ends");
-                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
-                        document.getElementById("end").onclick = logout;
-                    } else if (message.value=="Game over :(") {
-                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
-                        document.getElementById("end").onclick = logout;
-                    }
-                    document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+                document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+                if (message.value=="Congratulations, you won!" || message.value=="Game over :(") {
+                    document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
+                    document.getElementById("end").onclick = logout;
                 }
                 break;
             case 3:
