@@ -395,19 +395,11 @@
                 }
                 break;
             case 2: //print
-                if (message.value=="New round") {
-                    alert(message.value);
-                } else {
-                    if (message.value=="Congratulations, you won!") {
-                        alert("Game ends");
-                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
-                        document.getElementById("end").onclick = logout;
-                    } else if (message.value=="Game over :(") {
-                        document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
-                        document.getElementById("end").onclick = logout;
-                    }
-                    document.getElementById("paragraph").innerHTML += message.value + "<br/>";
-                }
+                document.getElementById("paragraph").innerHTML += message.value + "<br/>";
+                if (message.value=="Congratulations, you won!" || message.value=="Game over :(") {
+                    document.getElementById("end").style = "position: fixed;bottom: 150px;left: 50px;visibility: visible;";
+                    document.getElementById("end").onclick = logout;
+                }      
                 break;
             case 3: //ask boolean
                 document.getElementById("paragraph").innerHTML += message.value.message + "<br/>";
