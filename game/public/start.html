@@ -101,21 +101,22 @@
         var f = document.createElement("div");
         var b = document.createElement("button");
         var t = document.createElement("p");
+        var t1 = document.createElement("p");
         t.textContent = "Enter your name:";
         b.type = "submit";
         b.style = "height: 20px; width: 60px; margin: 5px;";
         b.innerHTML = "Submit";
         var s = document.createElement("input");
         f.appendChild(t);
+        f.appendChild(t1);
         f.appendChild(s);
         f.appendChild(b);
         var x;
         b.onclick = function () {
             x = s.value;
             if (x.length<3 || x.length>10) {
-                alert("Your name should be between 3 and 10 characters.");
-                f.parentElement.removeChild(f);
-                login();
+                t1.textContent = "(Your name should be between 3 and 10 characters.)";
+                s.value = "";
             } else {
                 f.parentElement.removeChild(f);
                 sessionStorage.setItem("name", x);
