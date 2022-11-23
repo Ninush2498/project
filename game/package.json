@@ -15,7 +15,7 @@
     "https-localhost": "^4.5.3",
     "json-mask": "^0.3.9",
     "query-string": "^6.12.1",
-    "socket.io": "^2.3.0"
+    "socket.io": "^2.5.0"
   },
   "repository": {
     "type": "git",
